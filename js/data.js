@@ -41,6 +41,18 @@
     });
   }
 
+  /* Mide cuánto dura un vídeo sin llegar a subirlo */
+  const duracionVideo = (file) => new Promise((resolve) => {
+    const v = document.createElement('video');
+    const url = URL.createObjectURL(file);
+    const fin = (seg) => { URL.revokeObjectURL(url); resolve(seg); };
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => fin(isFinite(v.duration) ? v.duration : 0);
+    v.onerror = () => fin(0);
+    setTimeout(() => fin(0), 8000);
+    v.src = url;
+  });
+
   const leerDataUrl = (blob) => new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
@@ -120,11 +132,26 @@
         demo.save(tabla, filas);
         return fila;
       }
-      const res = await rest(tabla, {
+      const enviar = (datos) => rest(tabla, {
         method: 'POST',
         headers: cabeceras({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-        body: JSON.stringify(fila)
+        body: JSON.stringify(datos)
       });
+
+      let res;
+      try {
+        res = await enviar(fila);
+      } catch (e) {
+        /* Si falta una columna porque aún no se ha ejecutado una migración,
+           guardamos sin ese campo en vez de perder la candidatura entera. */
+        const falta = /Could not find the '([^']+)' column|column "([^"]+)" of relation/i.exec(e.message || '');
+        const campo = falta && (falta[1] || falta[2]);
+        if (!campo || !(campo in fila)) throw e;
+        console.warn('La columna "' + campo + '" no existe todavía en la base de datos. ' +
+          'Se guarda sin ella. Ejecuta supabase/migracion-2.sql para habilitarla.');
+        delete fila[campo];
+        return this.crear(tabla, fila);
+      }
       return Array.isArray(res) ? res[0] : res;
     },
 
@@ -159,9 +186,16 @@
     /* ---- archivos (imágenes y PDF) ---- */
     async subir(carpeta, file) {
       const esImagen = /^image\//.test(file.type);
-      const maxMb = esImagen ? 12 : 25;
+      const esVideo = /^video\//.test(file.type);
+      const maxMb = esImagen ? 12 : (esVideo ? 45 : 25);
       if (file.size > maxMb * 1024 * 1024) {
-        throw new Error('El archivo pesa más de ' + maxMb + ' MB. Reduce el tamaño e inténtalo otra vez.');
+        throw new Error('El archivo pesa más de ' + maxMb + ' MB. Grábalo más corto o en menos calidad.');
+      }
+      if (esVideo) {
+        const seg = await duracionVideo(file);
+        if (seg && seg > 95) {
+          throw new Error('El vídeo dura ' + Math.round(seg) + ' segundos. El máximo es 1 minuto y medio.');
+        }
       }
       const blob = esImagen
         ? await comprimirImagen(file, carpeta === 'fotos' ? 1400 : 1600, 0.82)
@@ -169,7 +203,7 @@
 
       if (!LIVE) {
         if (!esImagen) {
-          throw new Error('En modo demo no se pueden guardar PDFs (ocupan demasiado en el navegador). Conecta Supabase y vuelve a subirlo.');
+          throw new Error('En modo demo no se pueden guardar PDFs ni vídeos (ocupan demasiado en el navegador). Conecta Supabase y vuelve a subirlo.');
         }
         const chico = await comprimirImagen(file, 900, 0.7);
         return leerDataUrl(chico);

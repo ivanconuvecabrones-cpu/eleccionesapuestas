@@ -58,23 +58,30 @@ window.CONFIG = {
     'Interwetten', 'Retabet', 'William Hill', 'Otra'
   ],
 
-  /* ---------- 7. CARTERAS MINISTERIALES ---------- */
+  /* ---------- 7. CARTERAS MINISTERIALES ----------
+     Ojo: la clave 'min_otros' es el nombre de la columna en la base de
+     datos. Se quedó así de cuando la cartera se llamaba "Otros"; ahora
+     es la de Inversiones. Cambiar el nombre de aquí no afecta a nada. */
   MINISTERIOS: [
-    { clave: 'min_nba',     nombre: 'Ministro de NBA',       icono: '🏀' },
-    { clave: 'min_futbol',  nombre: 'Ministro de Fútbol',    icono: '⚽' },
-    { clave: 'min_otros',   nombre: 'Ministro de Otros',     icono: '🎯' }
+    { clave: 'min_nba',    nombre: 'Ministro de NBA',         icono: '🏀' },
+    { clave: 'min_futbol', nombre: 'Ministro de Fútbol',      icono: '⚽' },
+    { clave: 'min_otros',  nombre: 'Ministro de Inversiones', icono: '💹' }
   ],
 
   /* ---------- 8. MÉTRICAS DEL CANDIDATO (1-10) ---------- */
   STATS: [
-    { clave: 'riesgo',        nombre: 'Riesgo que asume',        icono: '🎲', desc: '1 = ultra conservador · 10 = kamikaze' },
-    { clave: 'rentabilidad',  nombre: 'Rentabilidad que ofrece', icono: '📈', desc: 'Lo que promete sacarle al mes' },
-    { clave: 'rapidez',       nombre: 'Rapidez y presencia',     icono: '⚡', desc: 'Lo pendiente que está del grupo' },
-    { clave: 'disciplina',    nombre: 'Disciplina y bankroll',   icono: '🧱', desc: 'Lo bien que gestiona el stake' },
-    { clave: 'transparencia', nombre: 'Transparencia',           icono: '🔍', desc: 'Si justifica cada pick con análisis' },
-    { clave: 'nba',           nombre: 'Nivel NBA',               icono: '🏀', desc: 'Lo que sabe de baloncesto' },
-    { clave: 'futbol',        nombre: 'Nivel Fútbol',            icono: '⚽', desc: 'Lo que sabe de fútbol' },
-    { clave: 'otros',         nombre: 'Nivel otros deportes',    icono: '🎾', desc: 'Tenis, UFC, F1, lo que sea' }
+    { clave: 'riesgo',        nombre: 'Riesgo que asume',        corto: 'Riesgo',       icono: '🎲', desc: '1 = ultra conservador · 10 = kamikaze' },
+    { clave: 'rentabilidad',  nombre: 'Rentabilidad que ofrece', corto: 'Rentabilidad', icono: '📈', desc: 'Lo que promete sacarle al mes' },
+    { clave: 'rapidez',       nombre: 'Rapidez y presencia',     corto: 'Rapidez',      icono: '⚡', desc: 'Lo pendiente que está del grupo' },
+    { clave: 'disciplina',    nombre: 'Disciplina y bankroll',   corto: 'Disciplina',   icono: '🧱', desc: 'Lo bien que gestiona el stake' },
+    { clave: 'transparencia', nombre: 'Transparencia',           corto: 'Transparencia', icono: '🔍', desc: 'Si justifica cada pick con análisis' },
+    { clave: 'liderazgo',     nombre: 'Capacidad de liderazgo',  corto: 'Liderazgo',    icono: '👑', desc: 'Si sabe llevar al grupo y tomar decisiones' },
+    { clave: 'motivacion',    nombre: 'Motivación y aguante',    corto: 'Motivación',   icono: '🔥', desc: 'Lo que anima al grupo y lo poco que se rinde' },
+    { clave: 'nba',           nombre: 'Nivel NBA',               corto: 'NBA',          icono: '🏀', desc: 'Lo que sabe de baloncesto' },
+    { clave: 'futbol',        nombre: 'Nivel Fútbol',            corto: 'Fútbol',       icono: '⚽', desc: 'Lo que sabe de fútbol' },
+    { clave: 'otros',         nombre: 'Nivel otros deportes',    corto: 'Otros dep.',   icono: '🎾', desc: 'Tenis, UFC, F1, lo que sea' },
+    { clave: 'inversiones',   nombre: 'Nivel inversiones',       corto: 'Inversiones',  icono: '💹', desc: 'Bolsa, fondos, lo que no son apuestas' },
+    { clave: 'cripto',        nombre: 'Nivel cripto',            corto: 'Cripto',       icono: '💰', desc: 'Lo que controla de criptomonedas' }
   ],
 
   /* ---------- 9. TEST DE AFINIDAD ----------
@@ -100,7 +107,15 @@ window.CONFIG = {
     { id: 'q9', peso: 1, pregunta: '¿Qué papel tienen las apuestas en vivo?',
       opciones: ['Ninguno, todo prepartido', 'Alguna suelta si hay oportunidad', 'Muchas, el directo es donde está el valor'] },
     { id: 'q10', peso: 1, pregunta: '¿Qué tono debe tener el grupo?',
-      opciones: ['Serio, datos y nada más', 'Mitad datos mitad cachondeo', 'Cachondeo total, esto es por diversión'] }
+      opciones: ['Serio, datos y nada más', 'Mitad datos mitad cachondeo', 'Cachondeo total, esto es por diversión'] },
+    { id: 'q11', peso: 2, pregunta: 'Camilo (stats) no sube cuota ese día. ¿Qué haces?',
+      opciones: ['Me espero: si no hay, no hay', 'Hago alguna por mi cuenta', 'Le meto a otras, el día no se pierde'] },
+    { id: 'q12', peso: 2, pregunta: 'Alguien pasa una cuota con buen fundamento, pero un poco loca.',
+      opciones: ['Paso, por muy bien contada que esté', 'Me lo pienso y luego decido', 'Le meto sin pensar'] },
+    { id: 'q13', peso: 2, pregunta: 'Cuando se pasan apuestas al grupo, ¿le metes a todas?',
+      opciones: ['Sí, a todas y sin mirar', 'Depende: me las miro una a una', 'Casi a ninguna, soy muy selectivo'] },
+    { id: 'q14', peso: 2, pregunta: 'Encuentras tú una apuesta que te gusta. ¿Qué haces?',
+      opciones: ['La meto yo primero y luego la paso', 'La paso antes y espero a que el grupo la confirme', 'La paso y la meto a la vez, sin esperar a nadie'] }
   ],
 
   /* ---------- 10. TEMAS DEL DEBATE ---------- */

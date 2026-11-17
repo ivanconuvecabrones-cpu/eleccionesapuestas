@@ -131,25 +131,11 @@
   function vInicio() {
     const cs = S.d.candidatos;
     const hito = U.proximoHito(S.f);
-    const F = C.FECHAS;
-    const ahora = Date.now();
-    const t = (k) => new Date(F[k]).getTime();
-
-    const fasesTl = [
-      { n: 'Fase 1', t: 'Candidaturas', d: U.fechaCorta(F.inicio_campana) + ' → ' + U.fechaCorta(F.cierre_candidatos),
-        x: 'Quien quiera presentarse, rellena su ficha.', ini: t('inicio_campana'), fin: t('cierre_candidatos') },
-      { n: 'Fase 2', t: 'Campaña y test', d: 'hasta el ' + U.fechaCorta(F.apertura_voto),
-        x: 'Programas, noticias y test de afinidad.', ini: t('inicio_campana'), fin: t('apertura_voto') },
-      { n: 'Fase 3', t: 'Debate', d: U.fechaLarga(F.debate) + ' · 22:00',
-        x: 'Cara a cara entre los candidatos.', ini: t('debate'), fin: t('debate') + 7200000 },
-      { n: 'Fase 4', t: 'Votación', d: U.fechaCorta(F.apertura_voto) + ' → ' + U.fechaCorta(F.cierre_voto),
-        x: C.ESCANOS + ' votos, ' + C.ESCANOS + ' escaños, mayoría en ' + C.MAYORIA + '.',
-        ini: t('apertura_voto'), fin: t('cierre_voto') }
-    ];
-
-    const destacados = cs.slice(0, 3);
+    const noticias = S.d.noticias.slice(0, 4);
+    const fotos = S.d.galeria.slice(0, 6);
 
     pinta(
+      /* ---------- portada ---------- */
       '<div class="wrap hero">' +
         '<div class="hero-grid">' +
           '<div class="reveal">' +
@@ -167,7 +153,9 @@
                 : '<a class="btn btn-lg btn-ghost" data-ruta="/test">¿Con quién encajo?</a>') +
             '</div>' +
           '</div>' +
-          '<div class="reveal d2"><div class="hero-bird">🦅</div></div>' +
+          '<div class="reveal d2">' +
+            '<img class="hero-logo" src="img/logo.png" alt="AveFénix" width="400" height="400">' +
+          '</div>' +
         '</div>' +
 
         (hito.iso ? '<div class="card reveal d3" style="margin-top:2rem">' +
@@ -178,22 +166,16 @@
           '</div></div>' : '') +
       '</div>' +
 
-      /* estado de las fases */
+      /* ---------- la semana, en gráfico ---------- */
       '<div class="wrap section" style="padding-top:1rem">' +
         '<div class="section-head"><div class="eyebrow">Calendario</div>' +
-        '<h2 class="display">Cómo va esto</h2></div>' +
-        '<div class="phases">' + fasesTl.map((f) => {
-          const estado = ahora > f.fin ? 'done' : (ahora >= f.ini ? 'now' : '');
-          return '<div class="phase ' + estado + '">' +
-            '<div class="phase-n">' + f.n + (estado === 'now' ? ' · en marcha' : estado === 'done' ? ' · cerrada' : '') + '</div>' +
-            '<div class="phase-t">' + f.t + '</div>' +
-            '<div class="tiny" style="color:var(--amber)">' + f.d + '</div>' +
-            '<div class="tiny muted" style="margin-top:.4rem">' + f.x + '</div>' +
-            '<div class="phase-bar"></div></div>';
-        }).join('') + '</div>' +
+        '<h2 class="display">Cómo va esto</h2>' +
+        '<p class="lead tiny">Del ' + U.fechaLarga(C.FECHAS.inicio_campana) + ' al ' +
+          U.fechaLarga(C.FECHAS.cierre_voto) + '. Esto es lo que ocupa cada fase.</p></div>' +
+        '<div class="card">' + U.semana() + '</div>' +
       '</div>' +
 
-      /* candidatos */
+      /* ---------- candidatos ---------- */
       '<div class="wrap section" style="padding-top:0">' +
         '<div class="section-head spread">' +
           '<div><div class="eyebrow">' + cs.length + ' candidatura' + (cs.length === 1 ? '' : 's') + '</div>' +
@@ -201,17 +183,55 @@
           (cs.length > 3 ? '<a class="btn btn-sm" data-ruta="/candidatos">Ver todos</a>' : '') +
         '</div>' +
         (cs.length
-          ? '<div class="poster-grid">' + destacados.map((c, i) => cartel(c, i)).join('') + '</div>'
+          ? '<div class="poster-grid">' + cs.slice(0, 6).map(function (c, i) { return cartel(c, i); }).join('') + '</div>'
           : U.vacio('🪶', 'Todavía no hay nadie',
               S.f.candidatos === 'abierta'
                 ? 'Sé el primero en presentarte. Le das al botón de arriba y rellenas tu ficha.'
                 : 'El plazo de candidaturas está cerrado.')) +
       '</div>' +
 
-      /* accesos */
+      /* ---------- comparación automática ---------- */
+      (cs.length >= 2 ? comparacionRapida(cs) : '') +
+
+      /* ---------- el muro, aquí mismo ---------- */
+      ((noticias.length || fotos.length)
+        ? '<div class="wrap section" style="padding-top:0">' +
+            '<div class="section-head spread">' +
+              '<div><div class="eyebrow">Campaña</div><h2 class="display">El muro</h2></div>' +
+              '<a class="btn btn-sm" data-ruta="/muro">Ver todo el muro</a>' +
+            '</div>' +
+            '<div class="home-wall">' +
+              '<div class="card"><h3 style="margin-bottom:.4rem">📰 Últimas noticias</h3>' +
+                (noticias.length
+                  ? noticias.map(function (n) {
+                      const c = cand(n.candidato_id);
+                      return '<div class="wall-item">' +
+                        (n.imagen_url ? '<img class="wall-thumb zoom" src="' + U.escUrl(n.imagen_url) +
+                          '" data-img="' + U.escUrl(n.imagen_url) + '" alt="" loading="lazy">' : '') +
+                        '<div style="min-width:0">' +
+                          '<div style="font-weight:750;line-height:1.25">' + U.esc(n.titulo) + '</div>' +
+                          '<div class="tiny muted" style="margin-top:.25rem">' + U.esc(n.autor || '') +
+                            (c ? ' · ' + U.esc(c.partido || c.nombre) : '') + ' · ' + U.hace(n.created_at) + '</div>' +
+                          (n.cuerpo ? '<div class="tiny" style="color:var(--ink-2);margin-top:.3rem;' +
+                            'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' +
+                            U.esc(n.cuerpo) + '</div>' : '') +
+                        '</div></div>';
+                    }).join('')
+                  : '<p class="muted tiny" style="margin-top:.5rem">Nadie ha publicado nada todavía.</p>') +
+              '</div>' +
+              '<div class="card"><h3 style="margin-bottom:.8rem">🖼️ Carteles y memes</h3>' +
+                (fotos.length
+                  ? '<div class="wall-strip">' + fotos.map(itemGaleria).join('') + '</div>'
+                  : '<p class="muted tiny">Sin imágenes todavía.</p>') +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        : '') +
+
+      /* ---------- accesos ---------- */
       '<div class="wrap section" style="padding-top:0">' +
         '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">' +
-          atajo('🧭', 'Test de afinidad', 'Responde 10 preguntas y te dice qué candidato encaja contigo.', '/test') +
+          atajo('🧭', 'Test de afinidad', 'Responde ' + C.TEST.length + ' preguntas y te dice qué candidato encaja contigo.', '/test') +
           atajo('⚖️', 'Comparador', 'Pon dos o más candidatos cara a cara, métrica por métrica.', '/comparar') +
           atajo('📊', 'Sondeo', 'Intención de voto no vinculante. Para ir metiendo presión.', '/sondeo') +
           atajo('🎤', 'Debate', 'Temas del cara a cara y preguntas que puedes mandar.', '/debate') +
@@ -221,6 +241,66 @@
       '</div>'
     );
     if (hito.iso) U.pintarCountdown($('#cd'), hito.iso);
+    enganchesGaleria();
+  }
+
+  /* ============ COMPARACIÓN AUTOMÁTICA DE LA HOME ============ */
+  function comparacionRapida(cs) {
+    const sel = cs.slice(0, 5);
+
+    const filaMetrica = function (s) {
+      const vals = sel.map(function (c) { return Number((c.stats || {})[s.clave]) || 0; });
+      const max = Math.max.apply(null, vals);
+      return '<tr><td class="lead-cell">' + s.icono + ' ' + U.esc(s.corto || s.nombre) + '</td>' +
+        sel.map(function (c, i) {
+          const v = vals[i];
+          const lider = max > 0 && v === max && vals.filter(function (x) { return x === max; }).length === 1;
+          return '<td>' +
+            '<span style="font-weight:800' + (lider ? ';color:var(--lime)' : '') + '">' + v + '</span>' +
+            '<span class="tiny muted">/10</span>' +
+            '<div class="qc-bar"><i style="width:' + (v * 10) + '%;background:' + U.esc(c.color || '#ff6b1a') + '"></i></div>' +
+            '</td>';
+        }).join('') + '</tr>';
+    };
+
+    return '<div class="wrap section" style="padding-top:0">' +
+      '<div class="section-head spread">' +
+        '<div><div class="eyebrow">Cara a cara</div>' +
+        '<h2 class="display">Cómo se comparan</h2>' +
+        '<p class="lead tiny">Lo que ha declarado cada uno, sin tener que ir a ningún sitio.</p></div>' +
+        '<a class="btn btn-sm" data-ruta="/comparar">Comparador completo</a>' +
+      '</div>' +
+
+      '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
+        '<div class="card">' +
+          '<h3 style="margin-bottom:.5rem">🕸️ Perfiles superpuestos</h3>' +
+          '<div class="row tiny">' + sel.map(function (c) {
+            return '<span class="chip" style="border-color:' + U.esc(c.color) + '66">' +
+              '<span class="dot" style="background:' + U.esc(c.color) + '"></span>' + U.esc(c.nombre) + '</span>';
+          }).join('') + '</div>' +
+          '<div class="radar-wrap">' + U.radar(sel, 420) + '</div>' +
+        '</div>' +
+
+        '<div class="card">' +
+          '<h3 style="margin-bottom:.8rem">📊 Métrica a métrica</h3>' +
+          '<div class="quick-cmp"><table><thead><tr><th>Métrica</th>' +
+            sel.map(function (c) {
+              return '<th><div class="qc-head">' + U.avatar(c, 'qc-av') +
+                '<span style="color:' + U.esc(c.color) + '">' + U.esc(c.alias || c.nombre.split(' ')[0]) + '</span></div></th>';
+            }).join('') +
+          '</tr></thead><tbody>' +
+            C.STATS.map(filaMetrica).join('') +
+            '<tr><td class="lead-cell">💶 Unidad</td>' + sel.map(function (c) {
+              return '<td style="font-weight:750">' + (c.unidad ? U.esc(c.unidad) + ' €' : '—') + '</td>';
+            }).join('') + '</tr>' +
+            '<tr><td class="lead-cell">🏛️ Casa</td>' + sel.map(function (c) {
+              return '<td>' + U.esc(c.casa_apuestas || '—') + '</td>';
+            }).join('') + '</tr>' +
+          '</tbody></table></div>' +
+          '<p class="tiny muted" style="margin-top:.7rem">En verde, quien va por delante en cada cosa.</p>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
   const atajo = (ico, t, d, r) =>
@@ -234,6 +314,8 @@
     const col = U.esc(c.color || '#ff6b1a');
     return '<div class="poster reveal d' + ((i % 6) + 1) + '" data-ruta="/candidato/' + U.esc(c.id) + '">' +
       '<div class="poster-num">' + (i + 1) + '</div>' +
+      (c.emblema_url ? '<img class="poster-emblema" src="' + U.escUrl(c.emblema_url) +
+        '" alt="Emblema" loading="lazy">' : '') +
       '<div class="poster-photo' + (c.foto_url ? '' : ' ph') + '">' +
         (c.foto_url
           ? '<img src="' + U.escUrl(c.foto_url) + '" alt="' + U.esc(c.nombre) + '" loading="lazy">'
@@ -242,7 +324,7 @@
       '</div>' +
       '<div class="poster-body">' +
         (c.partido ? '<div class="poster-party" style="background:' + col + '26;color:' + col + ';border:1px solid ' + col + '66">' +
-          U.esc(c.emoji || '') + ' ' + U.esc(c.siglas || c.partido) + '</div>' : '') +
+          (c.emblema_url ? '' : U.esc(c.emoji || '') + ' ') + U.esc(c.siglas || c.partido) + '</div>' : '') +
         '<div class="poster-name">' + U.esc(c.nombre) + '</div>' +
         (c.alias ? '<div class="poster-alias">«' + U.esc(c.alias) + '»</div>' : '') +
         (c.lema ? '<div class="poster-slogan">' + U.esc(c.lema) + '</div>' : '') +
@@ -309,9 +391,12 @@
         '</div>' +
 
         '<div>' +
-          (c.partido ? '<div class="poster-party" style="background:' + col + '26;color:' + col +
-            ';border:1px solid ' + col + '66;font-size:.78rem">' + U.esc(c.emoji || '') + ' ' +
-            U.esc(c.partido) + (c.siglas ? ' · ' + U.esc(c.siglas) : '') + '</div>' : '') +
+          (c.partido ? '<div class="row" style="gap:.6rem;align-items:center">' +
+            (c.emblema_url ? '<img class="emblema-lg" src="' + U.escUrl(c.emblema_url) + '" alt="Emblema">' : '') +
+            '<div class="poster-party" style="background:' + col + '26;color:' + col +
+            ';border:1px solid ' + col + '66;font-size:.78rem;margin:0">' +
+            (c.emblema_url ? '' : U.esc(c.emoji || '') + ' ') +
+            U.esc(c.partido) + (c.siglas ? ' · ' + U.esc(c.siglas) : '') + '</div></div>' : '') +
           '<h1 class="display" style="font-size:clamp(2.2rem,6vw,4rem);margin:.4rem 0 .2rem">' + U.esc(c.nombre) + '</h1>' +
           (c.alias ? '<div style="color:var(--amber);font-weight:800;font-size:1.15rem">«' + U.esc(c.alias) + '»</div>' : '') +
           (c.lema ? '<p class="lead" style="margin-top:.9rem;font-style:italic">“' + U.esc(c.lema) + '”</p>' : '') +
@@ -326,6 +411,7 @@
           '<div class="row" style="margin-top:1.2rem">' +
             (c.programa_url ? '<a class="btn btn-primary btn-sm" href="' + U.escUrl(c.programa_url) +
               '" target="_blank" rel="noopener">📄 Ver programa en PDF</a>' : '') +
+            (c.video_url ? '<button class="btn btn-sm" id="ver-video">🎬 Ver su vídeo</button>' : '') +
             '<a class="btn btn-sm" data-ruta="/comparar">⚖️ Comparar con otros</a>' +
             (S.f.voto === 'abierta' ? '<a class="btn btn-fire btn-sm" data-ruta="/votar">🗳️ Votarle</a>' : '') +
           '</div>' +
@@ -336,6 +422,7 @@
       '<div style="margin-top:2.6rem">' +
         '<div class="tabs" id="tabs">' +
           tab('programa', 'Programa', true) +
+          (c.video_url ? tab('video', '🎬 Vídeo') : '') +
           tab('numeros', 'Sus números') +
           tab('gabinete', 'Gabinete') +
           tab('noticias', 'Noticias (' + noticias.length + ')') +
@@ -347,6 +434,14 @@
     '</div>');
 
     const cuerpos = {
+      video: () =>
+        c.video_url
+          ? '<div class="card"><h3 style="margin-bottom:.3rem">🎬 Su vídeo de campaña</h3>' +
+            '<p class="tiny muted" style="margin-bottom:1rem">Un minuto para convencerte.</p>' +
+            '<div class="video-wrap"><video src="' + U.escUrl(c.video_url) +
+            '" controls preload="metadata" playsinline></video></div></div>'
+          : U.vacio('🎬', 'Sin vídeo', 'Este candidato no ha subido vídeo de campaña.'),
+
       programa: () =>
         '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">' +
           '<div class="card"><h3 style="margin-bottom:.7rem">🎯 Qué propone</h3>' +
@@ -405,6 +500,11 @@
     };
     $$('#tabs .tab').forEach((t) => t.addEventListener('click', () => mostrar(t.dataset.tab)));
     mostrar('programa');
+    const btnVideo = $('#ver-video');
+    if (btnVideo) btnVideo.addEventListener('click', () => {
+      mostrar('video');
+      $('#tab-body').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   const kv = (k, v) => '<div class="kv"><div class="kv-k">' + U.esc(k) + '</div><div class="kv-v">' + U.esc(v) + '</div></div>';
@@ -452,10 +552,19 @@
           campo('Color del partido', '<div class="color-swatches" id="c-colores">' +
             U.COLORES.map((col, i) => '<div class="swatch' + (i === 0 ? ' sel' : '') + '" data-color="' + col +
               '" style="background:' + col + '"></div>').join('') + '</div>', true) +
-          campo('Emblema', '<div class="color-swatches" id="c-emojis">' +
-            U.EMOJIS.map((e, i) => '<div class="swatch' + (i === 0 ? ' sel' : '') +
-              '" data-emoji="' + e + '" style="background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:1.1rem">' +
-              e + '</div>').join('') + '</div>', false) +
+          campo('Emblema del partido',
+            '<div class="row" style="align-items:flex-start;gap:1rem;flex-wrap:nowrap">' +
+              '<img id="c-emblema-prev" class="emblema-prev" alt="" style="display:none">' +
+              '<div style="flex:1;min-width:0">' +
+                '<input type="file" id="c-emblema" accept="image/*">' +
+                '<div class="hint" style="margin:.5rem 0 .4rem">O elige uno de estos:</div>' +
+                '<div class="color-swatches" id="c-emojis">' +
+                U.EMOJIS.map((e, i) => '<div class="swatch' + (i === 0 ? ' sel' : '') +
+                  '" data-emoji="' + e + '" style="background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:1.1rem">' +
+                  e + '</div>').join('') + '</div>' +
+              '</div>' +
+            '</div>',
+            false, 'Sube tu escudo o logo. Cuadrado queda mejor.') +
         '</div>') +
 
         bloque('3 · Tu programa', '<div class="form-grid">' +
@@ -468,6 +577,8 @@
             false, 'Cortas y claras. Las que dejes vacías no se publican.') +
           campo('Programa electoral en PDF', '<input type="file" id="c-pdf" accept="application/pdf">',
             false, 'El documento largo y bien hecho, si lo tienes. Máximo 25 MB.') +
+          campo('Vídeo de campaña', '<input type="file" id="c-video" accept="video/*">',
+            false, 'Un minuto como mucho, grabado con el móvil vale. Máximo 45 MB.') +
           campo('Si no sales presidente, ¿a quién apoyarías?',
             '<input type="text" id="c-apoyo" maxlength="60" placeholder="Nombre o partido">',
             false, 'Para los pactos. Opcional.') +
@@ -536,6 +647,15 @@
     };
     swatch('c-colores'); swatch('c-emojis');
 
+    /* vista previa del emblema subido */
+    const inEmbl = $('#c-emblema'), prevEmbl = $('#c-emblema-prev');
+    if (inEmbl) inEmbl.addEventListener('change', () => {
+      const f = inEmbl.files[0];
+      if (!f) { prevEmbl.style.display = 'none'; return; }
+      prevEmbl.src = URL.createObjectURL(f);
+      prevEmbl.style.display = 'block';
+    });
+
     /* sliders */
     $$('.c-stat').forEach((r) => {
       const salida = r.parentElement.querySelector('.slider-val');
@@ -585,11 +705,15 @@
         const stats = {};
         $$('.c-stat').forEach((r) => { stats[r.dataset.stat] = Number(r.value); });
 
-        let foto_url = null, programa_url = null;
+        let foto_url = null, programa_url = null, emblema_url = null, video_url = null;
         const ffoto = $('#c-foto').files[0];
         const fpdf = $('#c-pdf').files[0];
+        const fembl = $('#c-emblema').files[0];
+        const fvid = $('#c-video').files[0];
         if (ffoto) { btn.textContent = 'Subiendo foto…'; foto_url = await DB.subir('fotos', ffoto); }
+        if (fembl) { btn.textContent = 'Subiendo emblema…'; emblema_url = await DB.subir('emblemas', fembl); }
         if (fpdf) { btn.textContent = 'Subiendo programa…'; programa_url = await DB.subir('programas', fpdf); }
+        if (fvid) { btn.textContent = 'Subiendo vídeo… (puede tardar)'; video_url = await DB.subir('videos', fvid); }
 
         btn.textContent = 'Guardando…';
         const fila = {
@@ -606,7 +730,7 @@
           unidad: Number($('#c-unidad').value) || null,
           bankroll: Number($('#c-bankroll').value) || null,
           stats, test_respuestas: test,
-          foto_url, programa_url
+          foto_url, programa_url, emblema_url, video_url
         };
         $$('.c-min').forEach((s) => { fila[s.dataset.min] = s.value || null; });
 

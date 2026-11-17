@@ -21,6 +21,16 @@ Somos **11**: 11 escaños y mayoría absoluta en **6**.
 - Probado de extremo a extremo contra la base de datos real: presentar
   candidatura, votar, subir imágenes, moderar y cambiar fases.
 
+## Pendiente: una migración de 2 líneas
+
+Para que funcionen el **vídeo de campaña** y el **emblema por imagen** hay que
+añadir dos columnas. Pega `supabase/migracion-2.sql` en el
+[SQL Editor](https://supabase.com/dashboard/project/tuknqpushteljccnzsxi/sql/new)
+y dale a Run.
+
+Mientras no lo hagas la web funciona igual: simplemente guarda las
+candidaturas sin vídeo ni emblema propio, y avisa por la consola.
+
 ## Lo que falta
 
 ### Paso 1 · Subir la web
@@ -124,8 +134,10 @@ Todo está en `js/config.js`:
 - `MIEMBROS` — los nombres y códigos del grupo.
 - `FECHAS` — el calendario electoral.
 - `CASAS` — la lista de casas de apuestas.
-- `MINISTERIOS` — las carteras del gabinete (NBA, fútbol, otros).
-- `STATS` — las ocho métricas que declara cada candidato.
+- `MINISTERIOS` — las carteras del gabinete (NBA, fútbol, inversiones).
+  Ojo: la clave `min_otros` es el nombre de la columna en la base de datos y
+  no hay que tocarla; el nombre visible sí.
+- `STATS` — las doce métricas que declara cada candidato.
 - `TEST` — las preguntas del test de afinidad.
 - `TEMAS_DEBATE` — los temas del cara a cara.
 - `ESCANOS` — cuántos sois (si cambia el número, la mayoría se recalcula sola).
@@ -144,3 +156,24 @@ avefenix-elecciones/
 ├── js/app.js        ← las vistas
 └── supabase/schema.sql
 ```
+
+
+---
+
+## Qué sube cada candidato
+
+| Cosa | Formato | Límite |
+|---|---|---|
+| Foto de campaña | imagen | 12 MB, se recorta vertical (5:7) |
+| Emblema del partido | imagen cuadrada | 12 MB (o eliges un emoji) |
+| Programa electoral | PDF | 25 MB |
+| Vídeo de campaña | vídeo | 45 MB y minuto y medio |
+
+Las imágenes se reducen solas antes de subirse, así que no hace falta que
+nadie se preocupe por el tamaño.
+
+## El logo
+
+Está en `img/`. `logo.png` es el grande del inicio, `logo-96.png` el de la
+barra y `favicon.png` el de la pestaña. Se les quitó el fondo negro, así que
+se pueden poner sobre cualquier fondo oscuro.
