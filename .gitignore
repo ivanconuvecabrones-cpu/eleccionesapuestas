@@ -1,0 +1,6 @@
+.DS_Store
+Thumbs.db
+.claude/
+
+# Los codigos en claro NUNCA se suben al repo
+CODIGOS-PRIVADO.md
