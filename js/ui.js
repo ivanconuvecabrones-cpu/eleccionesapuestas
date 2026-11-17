@@ -327,20 +327,22 @@
     const pct = (ms) => Math.max(0, Math.min(100, ((ms - ini) / span) * 100));
     const ahora = Date.now();
 
-    const bloques = [
+    const tramos = [
       { nombre: 'Candidaturas', desde: ini, hasta: t('cierre_candidatos'),
-        col: 'linear-gradient(135deg,#ff6b1a,#ffb020)', txt: '#1a1206' },
+        col: 'linear-gradient(90deg,#ff6b1a,#ffb020)', punto: '#ffb020' },
       { nombre: 'Votación', desde: t('apertura_voto'), hasta: fin,
-        col: 'linear-gradient(135deg,#ff2e63,#ff6b1a)', txt: '#fff' }
+        col: 'linear-gradient(90deg,#ff2e63,#ff6b1a)', punto: '#ff2e63' }
     ];
 
-    const barra = bloques.map((b) => {
-      const ancho = ((b.hasta - b.desde) / span) * 100;
-      return '<div class="week-seg" style="width:' + ancho.toFixed(2) + '%;background:' + b.col +
-        ';color:' + b.txt + '">' +
-        '<div class="week-seg-n">' + esc(b.nombre) + '</div>' +
-        '<div class="week-seg-p">' + Math.round(ancho) + '%</div></div>';
-    }).join('');
+    const anchos = tramos.map((b) => ((b.hasta - b.desde) / span) * 100);
+
+    const etiquetas = tramos.map((b, i) =>
+      '<div class="week-label" style="width:' + anchos[i].toFixed(2) + '%">' +
+        '<span class="dot" style="background:' + b.punto + '"></span>' + esc(b.nombre) +
+      '</div>').join('');
+
+    const pista = tramos.map((b, i) =>
+      '<div class="week-seg" style="width:' + anchos[i].toFixed(2) + '%;background:' + b.col + '"></div>').join('');
 
     const marca = (ahora > ini && ahora < fin)
       ? '<div class="week-now" style="left:' + pct(ahora).toFixed(2) + '%"></div>' : '';
@@ -349,8 +351,8 @@
     const dias = [];
     const d0 = new Date(ini); d0.setHours(0, 0, 0, 0);
     const dFin = new Date(fin);
+    const hoy = new Date();
     for (let d = new Date(d0); d <= dFin; d.setDate(d.getDate() + 1)) {
-      const hoy = new Date();
       const esHoy = d.toDateString() === hoy.toDateString();
       const pasado = d < new Date(hoy.toDateString());
       dias.push('<div class="week-day' + (esHoy ? ' hoy' : '') + (pasado ? ' pasado' : '') + '">' +
@@ -365,10 +367,28 @@
       { ico: '🏆', txt: 'Resultados la noche del ' + fechaCorta(F.cierre_voto) }
     ].map((h) => '<span class="chip">' + h.ico + ' ' + esc(h.txt) + '</span>').join('');
 
-    return '<div class="week">' + marca +
-      '<div class="week-bar">' + barra + '</div>' +
+    return '<div class="week">' +
+      '<div class="week-labels">' + etiquetas + '</div>' +
+      '<div class="week-linea">' + marca + '<div class="week-track">' + pista + '</div></div>' +
       '<div class="week-days">' + dias.join('') + '</div>' +
       '<div class="week-hitos">' + hitos + '</div></div>';
+  }
+
+  /* ---------------- colores de las casas de apuestas ---------------- */
+  const CASA_COLOR = {
+    'bet365': '#0a7d4b', 'betfair': '#ffb80c', 'winamax': '#e2001a',
+    'bwin': '#f5d300', 'codere': '#00a94f', 'sportium': '#0a9bdc',
+    'pinnacle': '#c8102e', 'betano': '#ff6a00', 'luckia': '#e63329',
+    'marathonbet': '#1565c0', '888sport': '#f57c00', 'interwetten': '#0d7a46',
+    'retabet': '#7ac143', 'william hill': '#1b4f72'
+  };
+  const colorCasa = (casa) => CASA_COLOR[String(casa || '').toLowerCase().trim()] || '#9d9893';
+
+  function chipCasa(casa) {
+    if (!casa) return '<span class="muted">—</span>';
+    const col = colorCasa(casa);
+    return '<span class="casa" style="--casa:' + col + '">' +
+      '<i class="casa-punto"></i>' + esc(casa) + '</span>';
   }
 
   /* ---------------- barras de métricas ---------------- */
@@ -430,15 +450,15 @@
   const EMOJIS = ['🔥', '🦅', '🏀', '⚽', '💰', '🎯', '🚀', '👑', '🎲', '⚡', '🧠', '🍀'];
 
   /* ---------------- selector genérico ---------------- */
-  const opciones = (lista, sel, vacio) =>
-    (vacio ? '<option value="">' + esc(vacio) + '</option>' : '') +
+  const opciones = (lista, sel, vacioTxt) =>
+    (vacioTxt ? '<option value="">' + esc(vacioTxt) + '</option>' : '') +
     lista.map((v) => {
       const val = typeof v === 'object' ? v.valor : v;
       const txt = typeof v === 'object' ? v.texto : v;
       return '<option value="' + esc(val) + '"' + (String(sel) === String(val) ? ' selected' : '') + '>' + esc(txt) + '</option>';
     }).join('');
 
-  /* ---------------- vacío ---------------- */
+  /* ---------------- estado vacío ---------------- */
   const vacio = (icono, titulo, texto) =>
     '<div class="empty"><div class="empty-ico">' + icono + '</div>' +
     '<h3 style="color:var(--ink);margin-bottom:.3rem">' + esc(titulo) + '</h3>' +
@@ -448,6 +468,7 @@
     esc, escUrl, nl2br, fechaCorta, fechaLarga, hace,
     fases, proximoHito, toast, modal, lightbox, avatar, emblema, pintarCountdown,
     radar, hemiciclo, semana, barras, afinidad, validarMiembro, hashCodigo,
+    colorCasa, chipCasa,
     COLORES, EMOJIS, opciones, vacio
   };
 })();

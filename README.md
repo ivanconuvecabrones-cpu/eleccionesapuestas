@@ -21,15 +21,10 @@ Somos **11**: 11 escaños y mayoría absoluta en **6**.
 - Probado de extremo a extremo contra la base de datos real: presentar
   candidatura, votar, subir imágenes, moderar y cambiar fases.
 
-## Pendiente: una migración de 2 líneas
+## Migraciones
 
-Para que funcionen el **vídeo de campaña** y el **emblema por imagen** hay que
-añadir dos columnas. Pega `supabase/migracion-2.sql` en el
-[SQL Editor](https://supabase.com/dashboard/project/tuknqpushteljccnzsxi/sql/new)
-y dale a Run.
-
-Mientras no lo hagas la web funciona igual: simplemente guarda las
-candidaturas sin vídeo ni emblema propio, y avisa por la consola.
+- `supabase/schema.sql` — las tablas y el bucket. **Ejecutada.**
+- `supabase/migracion-2.sql` — vídeo de campaña y emblema. **Ejecutada.**
 
 ## Lo que falta
 

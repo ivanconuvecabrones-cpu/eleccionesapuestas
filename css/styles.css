@@ -234,7 +234,8 @@ h3{font-size:1.15rem;font-weight:700;letter-spacing:-.01em}
 .poster-slogan{color:var(--ink-2);font-size:.86rem;margin-top:.5rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .poster-meta{display:flex;gap:.4rem;margin-top:.75rem;flex-wrap:wrap}
 .poster-num{
-  position:absolute;top:.9rem;left:.9rem;z-index:3;width:38px;height:38px;border-radius:11px;
+  position:absolute;top:.9rem;left:.9rem;z-index:3;min-width:38px;height:38px;
+  padding:0 .5rem;border-radius:11px;
   background:rgba(10,10,11,.82);backdrop-filter:blur(8px);border:1px solid var(--line-strong);
   display:grid;place-items:center;font-family:var(--font-display);font-size:1.25rem;
 }
@@ -480,23 +481,22 @@ footer{border-top:1px solid var(--line);margin-top:3rem;padding:2rem 0 2.6rem;co
 @media(max-width:900px){ .hero-logo{max-width:280px} }
 
 /* ---------- calendario de la semana ---------- */
-.week{margin-top:.4rem;position:relative;padding-top:20px}
-.week-bar{
-  position:relative;display:flex;height:54px;border-radius:14px;overflow:hidden;
-  border:1px solid var(--line);background:rgba(0,0,0,.3);
-}
-.week-seg{
-  position:relative;display:flex;flex-direction:column;justify-content:center;
-  padding:0 .8rem;min-width:0;overflow:hidden;transition:.3s;
-}
-.week-seg + .week-seg{border-left:1px solid rgba(0,0,0,.45)}
-.week-seg-n{
+.week{margin-top:.4rem;position:relative}
+.week-labels{display:flex;margin-bottom:.45rem}
+.week-label{
+  min-width:0;padding-right:.6rem;display:flex;align-items:center;gap:.4rem;
   font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.week-seg-p{font-family:var(--font-display);font-size:1.15rem;line-height:1}
+.week-linea{position:relative;padding-top:18px}
+.week-track{
+  display:flex;height:10px;border-radius:99px;overflow:hidden;
+  background:rgba(255,255,255,.07);
+}
+.week-seg{height:100%}
+.week-seg + .week-seg{border-left:2px solid var(--bg-2)}
 .week-now{
-  position:absolute;top:14px;height:62px;width:2px;background:#fff;z-index:4;
+  position:absolute;top:12px;height:22px;width:2px;background:#fff;z-index:4;
   box-shadow:0 0 10px rgba(255,255,255,.9);pointer-events:none;
 }
 .week-now::after{
@@ -504,7 +504,7 @@ footer{border-top:1px solid var(--line);margin-top:3rem;padding:2rem 0 2.6rem;co
   font-size:.58rem;font-weight:800;letter-spacing:.14em;color:#fff;
   background:#000;padding:1px 5px;border-radius:4px;border:1px solid var(--line-strong);
 }
-.week-days{display:flex;margin-top:.55rem;gap:3px}
+.week-days{display:flex;margin-top:.6rem;gap:3px}
 .week-day{
   flex:1;text-align:center;padding:.45rem .2rem;border-radius:9px;
   border:1px solid var(--line);background:var(--panel);min-width:0;
@@ -514,7 +514,57 @@ footer{border-top:1px solid var(--line);margin-top:3rem;padding:2rem 0 2.6rem;co
 .week-day-d{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .week-day-n{font-family:var(--font-display);font-size:1.15rem;line-height:1.1;margin-top:.1rem}
 .week-day.hoy .week-day-n{color:var(--amber)}
-.week-hitos{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem}
+.week-hitos{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.9rem}
+
+/* ---------- casa de apuestas con su color ---------- */
+.casa{
+  display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .6rem;border-radius:99px;
+  background:color-mix(in srgb, var(--casa) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--casa) 45%, transparent);
+  font-weight:750;font-size:.82rem;white-space:nowrap;
+}
+.casa-punto{width:8px;height:8px;border-radius:50%;background:var(--casa);flex-shrink:0;
+  box-shadow:0 0 8px var(--casa)}
+tr.fila-casa td{background:rgba(255,255,255,.035)}
+
+/* ---------- carrusel de imágenes ---------- */
+.carrusel-wrap{position:relative}
+.carrusel{
+  display:flex;gap:.7rem;overflow-x:auto;scroll-snap-type:x mandatory;
+  scroll-behavior:smooth;padding-bottom:.5rem;scrollbar-width:thin;
+}
+.carrusel::-webkit-scrollbar{height:6px}
+.carrusel::-webkit-scrollbar-thumb{background:#3a3a3d;border-radius:9px}
+.carrusel-item{
+  flex:0 0 auto;width:190px;aspect-ratio:1;border-radius:14px;overflow:hidden;
+  border:1px solid var(--line);background:var(--bg-3);scroll-snap-align:start;
+  cursor:pointer;position:relative;
+}
+.carrusel-item img{width:100%;height:100%;object-fit:cover;transition:.35s}
+.carrusel-item:hover img{transform:scale(1.06)}
+.carrusel-cap{
+  position:absolute;inset:auto 0 0 0;padding:.5rem .6rem;font-size:.75rem;font-weight:650;
+  background:linear-gradient(to top,rgba(8,8,9,.95),transparent);
+}
+.carrusel-nav{
+  position:absolute;top:calc(50% - 22px);width:38px;height:38px;border-radius:50%;
+  background:rgba(12,12,13,.9);border:1px solid var(--line-strong);cursor:pointer;
+  display:grid;place-items:center;font-size:1.1rem;z-index:3;transition:.15s;
+}
+.carrusel-nav:hover{background:var(--panel-2);transform:scale(1.07)}
+.carrusel-nav.izq{left:-6px}
+.carrusel-nav.der{right:-6px}
+@media(max-width:700px){
+  .carrusel-item{width:150px}
+  .carrusel-nav{display:none}
+}
+
+/* ---------- datos sueltos bajo el radar ---------- */
+.dato{display:flex;justify-content:space-between;align-items:center;gap:.8rem;
+  padding:.6rem 0;border-bottom:1px solid var(--line)}
+.dato:last-child{border-bottom:0}
+.dato-k{font-size:.85rem;color:var(--ink-2);min-width:0}
+.dato-v{font-weight:800;white-space:nowrap}
 
 /* ---------- emblema del partido ---------- */
 .emblema{
