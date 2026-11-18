@@ -730,7 +730,7 @@
 
         bloque('3 · Tu programa', '<div class="form-grid">' +
           campo('Qué vas a hacer de presidente',
-            '<textarea id="c-desc" maxlength="1800" placeholder="Explica tu proyecto: qué cambiarías, cómo gestionarías el grupo, qué aportas…" required>' +
+            '<textarea id="c-desc" style="min-height:200px" placeholder="Explica tu proyecto: qué cambiarías, cómo gestionarías el grupo, qué aportas…" required>' +
               U.esc(val(c && c.descripcion)) + '</textarea>',
             true, 'Esto es lo que se lee en tu ficha. Entre 3 y 10 líneas está bien.') +
           campo('Tus 5 promesas',
@@ -1718,7 +1718,7 @@
             '<input type="text" id="n-diario" maxlength="60" placeholder="El Diario del Valor, Radio Stake…">' +
             '<div class="hint">Opcional. Sale como cabecera de la noticia.</div></div>' +
           '<div class="field"><label>Titular</label><input type="text" id="n-titulo" maxlength="110" placeholder="El Partido del Valor promete bajar el stake" required></div>' +
-          '<div class="field"><label>Cuerpo</label><textarea id="n-cuerpo" maxlength="1200" placeholder="Desarrolla la noticia… (opcional, puede ir solo el titular)"></textarea></div>' +
+          '<div class="field"><label>Cuerpo</label><textarea id="n-cuerpo" style="min-height:220px" placeholder="Desarrolla la noticia… (opcional, puede ir solo el titular)"></textarea></div>' +
           '<div class="field"><label>Imágenes</label><input type="file" id="n-img" accept="image/*" multiple>' +
             '<div class="hint">Hasta 8. Si pones varias, se pasan en carrusel.</div></div>' +
           '<div id="n-aviso"></div>' +
