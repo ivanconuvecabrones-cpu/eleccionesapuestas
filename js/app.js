@@ -1401,7 +1401,10 @@
   /* ---------- quién soy (solo en este dispositivo) ---------- */
   const K_YO = 'avefenix:yo';
   const getYo = () => { try { return localStorage.getItem(K_YO) || ''; } catch (e) { return ''; } };
-  const setYo = (n) => { try { localStorage.setItem(K_YO, n); } catch (e) { /* sin almacenamiento */ } };
+  const setYo = (n) => {
+    try { localStorage.setItem(K_YO, n); } catch (e) { /* sin almacenamiento */ }
+    if (window.AVISOS) window.AVISOS.sincronizar();     // el servidor necesita saber quién eres
+  };
 
   /* Pide el nombre una sola vez y lo recuerda */
   function pedirYo() {

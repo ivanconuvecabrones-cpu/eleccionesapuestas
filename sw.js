@@ -5,7 +5,7 @@
    - Pinta los avisos y abre la web al tocarlos.
    ============================================================ */
 
-const CACHE = 'avefenix-v2';
+const CACHE = 'avefenix-v3';
 const BASICOS = ['./', 'index.html', 'img/logo-96.png', 'img/icon-192.png'];
 
 self.addEventListener('install', (e) => {
@@ -43,6 +43,22 @@ self.addEventListener('fetch', (e) => {
       .catch(() =>
         caches.match(r).then((hit) =>
           hit || (r.mode === 'navigate' ? caches.match('index.html') : undefined)))
+  );
+});
+
+/* Llega un aviso del servidor, aunque la web esté cerrada */
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; }
+  catch (err) { d = { titulo: 'AveFénix', cuerpo: e.data ? e.data.text() : '' }; }
+  e.waitUntil(
+    self.registration.showNotification(d.titulo || 'AveFénix', {
+      body: d.cuerpo || '',
+      icon: 'img/icon-192.png',
+      badge: 'img/favicon.png',
+      tag: d.tag || undefined,
+      data: { ruta: d.ruta || '/' }
+    })
   );
 });
 

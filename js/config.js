@@ -128,6 +128,11 @@ window.CONFIG = {
   /* Dirección pública de la web: la usan los enlaces al compartir */
   URL_WEB: 'https://ivanconuvecabrones-cpu.github.io/eleccionesapuestas/',
 
+  /* Clave PÚBLICA para los avisos al móvil con la app cerrada (Web Push).
+     Es pública por diseño. La privada vive solo en los secretos de la función
+     de Supabase "enviar-push". */
+  VAPID_PUBLICA: 'BBUrz_6L8xminnTlE7JTUGe4d-kbGl-7goO_ihVmfqU1XiRSd5slmjRmErzKqu9MRr3cglXQa4FvhAnx3OhT-VI',
+
   /* ---------- 10. TEMAS DEL DEBATE ---------- */
   TEMAS_DEBATE: [
     { titulo: 'Gestión del bankroll',        desc: '¿Unidad fija o stake variable? ¿Cuánto se arriesga al día?' },

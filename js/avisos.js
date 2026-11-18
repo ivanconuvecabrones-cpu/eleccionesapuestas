@@ -108,13 +108,43 @@
     try { new Notification(titulo, opciones); } catch (e) { /* no se puede */ }
   }
 
+  /* ---------- avisos con la app cerrada (Web Push) ----------
+     El dispositivo se suscribe y deja su "dirección" en Supabase junto al
+     nombre elegido; cuando pasa algo, una función de Supabase manda el aviso. */
+  let pushActivo = false;
+
+  const aBytes = (s) => {
+    const r = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(r, (c) => c.charCodeAt(0));
+  };
+
+  async function suscribir() {
+    const pub = window.CONFIG && window.CONFIG.VAPID_PUBLICA;
+    if (!pub || !('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    if (!soportaNotif() || Notification.permission !== 'granted') return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: aBytes(pub) });
+      const j = sub.toJSON();
+      await DB.guardarSuscripcion({
+        endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, nombre: yoActual() || null
+      });
+      pushActivo = true;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* se llama al abrir la web y cada vez que cambia el nombre elegido */
+  const sincronizar = () => (soportaNotif() && Notification.permission === 'granted') ? suscribir() : Promise.resolve(false);
+
   function avisar(nuevas) {
     /* dentro de la web: un aviso corto por cada una (máximo tres) */
     nuevas.slice(0, 3).forEach((n) => U.toast(n.ico + ' ' + n.titulo + ': ' + n.texto));
     if (nuevas.length > 3) U.toast('🔔 Y ' + (nuevas.length - 3) + ' novedades más. Mira la campanita.');
 
     /* del sistema: solo si no se está mirando la web */
-    if (!document.hidden) return;
+    if (!document.hidden || pushActivo) return;     // con push activo ya los manda el servidor
     if (nuevas.length > 3) {
       notificar('AveFénix · ' + nuevas.length + ' novedades', 'Abre la app para verlas.', '/', 'resumen');
     } else {
@@ -223,7 +253,11 @@
     }
     const p = Notification.permission;
     if (p === 'granted') {
-      return '<div class="alert alert-ok"><div><b>✅ Avisos activados</b>Te sale una notificación cuando haya una candidatura, noticia, imagen o pregunta nueva.</div></div>';
+      return pushActivo
+        ? '<div class="alert alert-ok"><div><b>✅ Avisos activados</b>Te llegan aunque la app esté cerrada: candidaturas, noticias, imágenes y preguntas nuevas, y los comentarios y reacciones que te tocan.</div></div>'
+        : '<div class="alert alert-ok"><div><b>✅ Avisos activados</b>Te llegan mientras la app esté abierta.' +
+          (esIOS() && !instalada() ? ' Para recibirlos con la app cerrada, instálala: <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.' : '') +
+          '</div></div>';
     }
     if (p === 'denied') {
       return '<div class="alert alert-warn"><div><b>Los tienes bloqueados</b>Hay que permitirlos en los ajustes del navegador para esta web.</div></div>';
@@ -261,8 +295,10 @@
           (m.nombre === yoActual() ? ' selected' : '') + '>' + U.esc(m.nombre) + '</option>').join('') +
       '</select><div class="hint">Para avisarte cuando comenten o reaccionen a tus noticias.</div></div>' +
       '<div class="grid" style="gap:.7rem;margin-top:1.1rem">' + bloqueAvisos() + bloqueInstalar() + '</div>' +
-      '<p class="tiny muted" style="margin-top:.9rem">Los avisos llegan mientras la app esté abierta o en segundo plano. ' +
-        'Si la cierras del todo, te enteras de lo que te hayas perdido en cuanto la abras.</p>');
+      '<p class="tiny muted" style="margin-top:.9rem">' + (pushActivo
+        ? 'Los avisos te llegan aunque cierres la app. Si no quieres más, quita el permiso en los ajustes del navegador.'
+        : 'Pulsa «Activar avisos» para recibirlos también con la app cerrada. ' +
+          'Sin eso, te enteras de lo que te hayas perdido en cuanto la abras.') + '</p>');
 
     document.querySelectorAll('.aviso-item').forEach((it) => it.addEventListener('click', () => {
       cerrar();
@@ -272,11 +308,13 @@
     const yoSel = document.getElementById('av-yo');
     if (yoSel) yoSel.addEventListener('change', () => {
       try { localStorage.setItem(K_YO, yoSel.value); } catch (e) { /* sin almacenamiento */ }
+      sincronizar();
     });
 
     const act = document.getElementById('av-activar');
     if (act) act.addEventListener('click', async () => {
       try { await Notification.requestPermission(); } catch (e) { /* ya está dicho */ }
+      await suscribir();
       cerrar(); abrirPanel();
     });
     const ins = document.getElementById('av-instalar');
@@ -304,6 +342,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) sondear(); });
     window.addEventListener('online', sondear);
 
+    sincronizar();
     sondear();
     clearInterval(timer);
     timer = setInterval(() => {
@@ -320,6 +359,7 @@
       propios.add(id); vistos.add(id); persistir();
       guardar(K_PROPIOS, JSON.stringify(Array.from(propios).slice(-200)));
     },
-    sondear: sondear
+    sondear: sondear,
+    sincronizar: sincronizar
   };
 })();

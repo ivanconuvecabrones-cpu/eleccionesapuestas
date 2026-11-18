@@ -268,6 +268,20 @@
       return true;
     },
 
+    /* ---- avisos al móvil: cada dispositivo deja aquí su suscripción ---- */
+    async guardarSuscripcion(s) {
+      if (!LIVE) return false;
+      await rest('suscripciones?on_conflict=endpoint', {
+        method: 'POST',
+        headers: cabeceras({
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal'
+        }),
+        body: JSON.stringify(s)
+      });
+      return true;
+    },
+
     /* ---- carga completa de todo lo que pinta la web ---- */
     async todo() {
       const peticiones = [

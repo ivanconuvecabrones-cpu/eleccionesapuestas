@@ -28,9 +28,9 @@ Somos **11**: 11 escaños y mayoría absoluta en **6**.
 - `supabase/migracion-3.sql` — nombre del diario y varias imágenes por noticia.
   **Pendiente.** Hasta que se ejecute, las noticias se guardan igual pero sin el
   nombre del diario y solo con la primera imagen (la web avisa al publicar).
-- `supabase/migracion-4.sql` — comentarios y reacciones en las noticias.
-  **Pendiente.** Hasta que se ejecute, las noticias se leen y se comparten, pero en
-  vez de comentarios y reacciones sale un aviso.
+- `supabase/migracion-4.sql` — comentarios y reacciones en las noticias. **Ejecutada.**
+- `supabase/migracion-5.sql` — avisos al móvil con la app cerrada (ver «App y avisos»).
+  **Ejecutada.**
 
 ## Lo que falta
 
@@ -203,12 +203,39 @@ La web se puede **instalar como app** (Android: menú del navegador →
 campanita 🔔 arriba con las novedades: candidaturas, noticias, imágenes y
 preguntas nuevas.
 
-Los avisos del sistema se activan desde la campanita y llegan **mientras la app
-esté abierta o en segundo plano**. Con la app cerrada del todo no llegan, porque
-eso exige un servidor que los empuje; en cuanto se abre, se entera de todo lo que
-se haya perdido. En iPhone solo funcionan con la app instalada.
+Los avisos del sistema se activan desde la campanita y llegan **aunque la app esté
+cerrada y el móvil bloqueado**. Funcionan con Web Push: cada dispositivo deja su
+suscripción en Supabase (tabla `suscripciones`, junto al nombre elegido en «Soy…») y
+una función de Supabase (`enviar-push`) manda el aviso cada vez que se crea algo.
 
-Archivos: `manifest.webmanifest`, `sw.js` y `js/avisos.js`.
+- **A todos** (menos a quien lo hace): candidatura nueva, noticia nueva, imagen nueva
+  en el muro y pregunta nueva.
+- **Solo a quien le toca:** un comentario avisa al autor de la noticia y a quien ya
+  había comentado en ella; una reacción avisa al autor de la noticia. Nadie recibe
+  aviso de lo que hace él mismo.
+- Para que te avisen de lo tuyo, hay que haber elegido tu nombre (al comentar o en la
+  campanita → «Soy…»).
+- **iPhone:** solo funciona con la web instalada como app (Compartir → Añadir a pantalla
+  de inicio). En Android funciona también desde el navegador.
+- Cada dispositivo debe pulsar «Activar avisos» una vez. Si ya había dado el permiso,
+  se suscribe solo al abrir la web.
+
+### Cómo está montado (para quien lo mantenga)
+
+- `supabase/migracion-5.sql` — crea la tabla `suscripciones` y un disparador en
+  candidatos, noticias, galería, preguntas, comentarios y reacciones que llama a la función.
+  Lleva un marcador `__SECRETO__` que hay que sustituir por el valor real de
+  `WEBHOOK_SECRET`. **No subas el valor real al repo.**
+- `supabase/functions/enviar-push/index.ts` — la función. Se despliega desde
+  Supabase → Edge Functions con «Verify JWT» **desactivado** (la protege el secreto del
+  disparador).
+- Secretos de la función (Edge Functions → Secrets): `VAPID_PUBLIC`, `VAPID_PRIVATE`,
+  `VAPID_SUBJECT` y `WEBHOOK_SECRET`. La clave pública también está en
+  `js/config.js` (`VAPID_PUBLICA`); la privada solo existe en Supabase. Si se perdiera,
+  se genera un par nuevo y cada dispositivo se vuelve a suscribir.
+- Si un dispositivo deja de existir, la función lo borra sola de la tabla.
+
+Archivos: `manifest.webmanifest`, `sw.js` (también recibe los avisos) y `js/avisos.js`.
 
 
 ## Noticias: leer, reaccionar, comentar y compartir
