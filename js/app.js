@@ -95,7 +95,14 @@
 
     if (window.AVISOS) {
       /* si llega algo nuevo, ponemos los datos al día sin tocar lo que se esté escribiendo */
-      window.AVISOS.iniciar({ alRecibir: () => recargar() });
+      window.AVISOS.iniciar({
+        alRecibir: async () => {
+          await recargar();
+          /* si estás leyendo una noticia y no estás escribiendo, se pone al día sola */
+          const escribiendo = document.querySelector('#com-texto');
+          if (S.ruta === '/noticia' && !(escribiendo && (escribiendo.value || document.activeElement === escribiendo))) vNoticia();
+        }
+      });
     }
   }
 
@@ -138,7 +145,7 @@
 
     const vistas = {
       '/': vInicio, '/candidatos': vCandidatos, '/candidato': vCandidato,
-      '/presentar': vPresentar, '/editar': vEditar, '/comparar': vComparar, '/test': vTest,
+      '/presentar': vPresentar, '/editar': vEditar, '/noticia': vNoticia, '/comparar': vComparar, '/test': vTest,
       '/sondeo': vSondeo, '/debate': vDebate, '/muro': vMuro,
       '/preguntas': vPreguntas, '/votar': vVotar, '/resultados': vResultados,
       '/admin': vAdmin
@@ -228,9 +235,9 @@
                 (noticias.length
                   ? noticias.map(function (n) {
                       const c = cand(n.candidato_id);
-                      return '<div class="wall-item">' +
-                        (imagenesNoticia(n)[0] ? '<img class="wall-thumb zoom" src="' + U.escUrl(imagenesNoticia(n)[0]) +
-                          '" data-img="' + U.escUrl(imagenesNoticia(n)[0]) + '" alt="" loading="lazy">' : '') +
+                      return '<div class="wall-item" data-ruta="/noticia/' + U.esc(n.id) + '" style="cursor:pointer">' +
+                        (imagenesNoticia(n)[0] ? '<img class="wall-thumb" src="' + U.escUrl(imagenesNoticia(n)[0]) +
+                          '" alt="" loading="lazy">' : '') +
                         '<div style="min-width:0">' +
                           (n.diario ? '<div class="news-medio" style="margin-bottom:.35rem;font-size:.72rem">' + U.esc(n.diario) + '</div>' : '') +
                           '<div style="font-weight:750;line-height:1.25">' + U.esc(n.titulo) + '</div>' +
@@ -1391,23 +1398,275 @@
     return n.imagen_url ? [n.imagen_url] : [];
   }
 
+  /* ---------- quién soy (solo en este dispositivo) ---------- */
+  const K_YO = 'avefenix:yo';
+  const getYo = () => { try { return localStorage.getItem(K_YO) || ''; } catch (e) { return ''; } };
+  const setYo = (n) => { try { localStorage.setItem(K_YO, n); } catch (e) { /* sin almacenamiento */ } };
+
+  /* Pide el nombre una sola vez y lo recuerda */
+  function pedirYo() {
+    return new Promise((resolve) => {
+      const ya = getYo();
+      if (ya && C.MIEMBROS.some((m) => m.nombre === ya)) { resolve(ya); return; }
+      let hecho = false;
+      const cerrar = U.modal(
+        '<div class="eyebrow">¿Quién eres?</div>' +
+        '<h3 style="margin:.6rem 0 .4rem;font-size:1.25rem">Elige tu nombre</h3>' +
+        '<p class="tiny muted" style="margin-bottom:1rem">Para poner tu nombre en lo que comentes o reacciones. ' +
+          'Se queda guardado en este dispositivo y no hace falta código.</p>' +
+        '<div class="field"><select id="yo-sel">' +
+          U.opciones(C.MIEMBROS.map((x) => x.nombre), '', 'Elige tu nombre…') + '</select></div>' +
+        '<button class="btn btn-primary btn-block" id="yo-ok" style="margin-top:1rem">Continuar</button>');
+      const obs = new MutationObserver(() => {
+        if (!document.getElementById('yo-sel')) { obs.disconnect(); if (!hecho) resolve(''); }
+      });
+      obs.observe(document.getElementById('capa-modal'), { childList: true });
+      $('#yo-ok').addEventListener('click', () => {
+        const v = $('#yo-sel').value;
+        if (!v) { U.toast('Elige tu nombre.', 'err'); return; }
+        setYo(v); hecho = true; cerrar(); resolve(v);
+      });
+    });
+  }
+
+  const reaccionesDe = (id) => S.d.reacciones.filter((r) => String(r.noticia_id) === String(id));
+  const comentariosDe = (id) => S.d.comentarios
+    .filter((c) => String(c.noticia_id) === String(id))
+    .sort((a, b) => (a.created_at > b.created_at ? 1 : -1));
+
+  function recortar(txt, max) {
+    const t = String(txt || '').replace(/\s+/g, ' ').trim();
+    if (t.length <= max) return t;
+    const corte = t.lastIndexOf(' ', max);
+    return t.slice(0, corte > max * 0.6 ? corte : max).replace(/[ ,.;:]+$/, '') + '…';
+  }
+
+  const hayTablaSocial = () => !(DB.sinTabla.comentarios || DB.sinTabla.reacciones);
+  const esMigracion = (msg) => /table|relation|schema cache|42P01|PGRST205/i.test(String(msg || ''));
+
+  /* ---------- tarjeta en el muro: título, un trozo y «leer más» ---------- */
   function tarjetaNoticia(n) {
     const c = cand(n.candidato_id);
     const col = c ? U.esc(c.color) : '#ff6b1a';
     const imgs = imagenesNoticia(n);
     const medio = (n.diario || '').trim();
-    return '<div class="card news-card">' +
+    const rs = reaccionesDe(n.id);
+    const nc = comentariosDe(n.id).length;
+    const resumen = recortar(n.cuerpo, 170);
+
+    const stats = C.REACCIONES
+      .map((t) => ({ t, n: rs.filter((r) => r.tipo === t.tipo).length }))
+      .filter((x) => x.n)
+      .map((x) => '<span>' + x.t.ico + ' ' + x.n + '</span>').join('') +
+      (nc ? '<span>💬 ' + nc + '</span>' : '');
+
+    return '<div class="card card-hover news-card" data-ruta="/noticia/' + U.esc(n.id) + '">' +
       (medio ? '<div class="news-medio">' + U.esc(medio) + '</div>' : '') +
-      (imgs.length > 1
-        ? carrusel(imgs.map((u) => ({ url: u, titulo: '' })), 'carrusel-noticia')
-        : (imgs.length
-            ? '<img src="' + U.escUrl(imgs[0]) + '" alt="" loading="lazy" class="zoom" data-img="' + U.escUrl(imgs[0]) + '">'
-            : '')) +
+      (imgs.length
+        ? '<div class="news-foto"><img src="' + U.escUrl(imgs[0]) + '" alt="" loading="lazy">' +
+          (imgs.length > 1 ? '<span class="news-mas">+' + (imgs.length - 1) + '</span>' : '') + '</div>'
+        : '') +
       '<div class="news-meta"><span class="dot" style="background:' + col + '"></span>' +
         U.esc(n.autor || 'Anónimo') + (c ? ' · ' + U.esc(c.partido || c.nombre) : '') +
         ' · ' + U.hace(n.created_at) + '</div>' +
       '<div class="news-title">' + U.esc(n.titulo) + '</div>' +
-      '<div class="news-body">' + U.nl2br(n.cuerpo || '') + '</div></div>';
+      (resumen ? '<div class="news-body news-resumen">' + U.esc(resumen) + '</div>' : '') +
+      '<div class="news-pie"><div class="news-stats">' + stats + '</div>' +
+        '<span class="news-leer">Leer más →</span></div></div>';
+  }
+
+  /* ---------- la noticia entera ---------- */
+  function enlaceNoticia(id) {
+    const base = /github\.io$/.test(location.hostname) ? location.origin + location.pathname : C.URL_WEB;
+    return base + '#/noticia/' + id;
+  }
+
+  function vNoticia() {
+    const n = S.d.noticias.find((x) => String(x.id) === String(S.param));
+    if (!n) {
+      pinta('<div class="wrap section">' + U.vacio('📰', 'Esa noticia ya no está', 'Puede que la hayan borrado.') +
+        '<div class="row" style="justify-content:center;margin-top:1rem"><a class="btn" data-ruta="/muro">Volver al muro</a></div></div>');
+      return;
+    }
+    const c = cand(n.candidato_id);
+    const col = c ? U.esc(c.color) : '#ff6b1a';
+    const imgs = imagenesNoticia(n);
+    const medio = (n.diario || '').trim();
+    const rs = reaccionesDe(n.id);
+    const yo = getYo();
+    const coms = comentariosDe(n.id);
+    const social = hayTablaSocial();
+
+    const barra = '<div class="reac-bar">' + C.REACCIONES.map((t) => {
+      const quienes = rs.filter((r) => r.tipo === t.tipo).map((r) => r.autor);
+      const mia = yo && quienes.indexOf(yo) >= 0;
+      return '<button type="button" class="reac-btn' + (mia ? ' mia' : '') + '" data-tipo="' + t.tipo +
+        '" title="' + U.esc(t.nombre + (quienes.length ? ': ' + quienes.join(', ') : '')) + '">' +
+        '<span class="reac-ico">' + t.ico + '</span><b>' + quienes.length + '</b></button>';
+    }).join('') + '</div>';
+
+    const quienReacciona = rs.length
+      ? '<div class="tiny muted" style="margin-top:.5rem">' + C.REACCIONES.map((t) => {
+          const q = rs.filter((r) => r.tipo === t.tipo).map((r) => r.autor);
+          return q.length ? t.ico + ' ' + U.esc(q.join(', ')) : '';
+        }).filter(Boolean).join(' &nbsp;·&nbsp; ') + '</div>' : '';
+
+    pinta('<div class="wrap section" style="max-width:820px">' +
+      '<a class="btn btn-sm btn-ghost" data-ruta="/muro" style="margin-bottom:1.2rem">← Volver al muro</a>' +
+
+      '<article class="card news-full">' +
+        (medio ? '<div class="news-medio">' + U.esc(medio) + '</div>' : '') +
+        '<h1 class="display news-h1">' + U.esc(n.titulo) + '</h1>' +
+        '<div class="news-meta" style="margin-bottom:1.1rem"><span class="dot" style="background:' + col + '"></span>' +
+          U.esc(n.autor || 'Anónimo') + (c ? ' · ' + U.esc(c.partido || c.nombre) : '') +
+          ' · ' + U.hace(n.created_at) + '</div>' +
+
+        (imgs.length > 1
+          ? carrusel(imgs.map((u) => ({ url: u, titulo: '' })), 'carrusel-noticia')
+          : (imgs.length
+              ? '<img class="news-img-grande zoom" src="' + U.escUrl(imgs[0]) + '" alt="" data-img="' + U.escUrl(imgs[0]) + '">'
+              : '')) +
+
+        ((n.cuerpo || '').trim() ? '<div class="news-body news-completo">' + U.nl2br(n.cuerpo) + '</div>' : '') +
+
+        '<div class="news-acciones">' +
+          (social ? '<div>' + barra + '</div>' : '') +
+          '<div class="row" style="gap:.5rem">' +
+            '<button type="button" class="btn btn-sm btn-primary" id="n-compartir">📤 Compartir</button>' +
+            '<button type="button" class="btn btn-sm" id="n-copiar">🔗 Copiar enlace</button>' +
+          '</div>' +
+        '</div>' +
+        (social ? quienReacciona : '') +
+      '</article>' +
+
+      '<div class="card" id="comentarios" style="margin-top:1.2rem">' +
+        '<h3 style="margin-bottom:1rem">💬 Comentarios (' + coms.length + ')</h3>' +
+        (social
+          ? (coms.length
+              ? '<div class="com-lista">' + coms.map((k) => {
+                  const kc = S.d.candidatos.find((x) => x.nombre === k.autor);
+                  const kcol = kc ? U.esc(kc.color) : '#6b6b70';
+                  return '<div class="comentario"><div class="com-av" style="background:' + kcol + '33;color:' + kcol +
+                    ';border-color:' + kcol + '66">' + U.esc((k.autor || '?')[0].toUpperCase()) + '</div>' +
+                    '<div style="min-width:0;flex:1"><div class="com-cab"><b>' + U.esc(k.autor) + '</b>' +
+                    '<span class="tiny muted">' + U.hace(k.created_at) + '</span></div>' +
+                    '<div class="com-txt">' + U.nl2br(k.texto) + '</div></div></div>';
+                }).join('') + '</div>'
+              : '<p class="muted tiny" style="margin-bottom:1rem">Todavía no ha comentado nadie. Abre tú el fuego.</p>') +
+            '<form id="f-comentar" class="grid" style="gap:.7rem;margin-top:1.1rem">' +
+              '<div class="field"><label>Comentas como</label><select id="com-nombre" required>' +
+                U.opciones(C.MIEMBROS.map((x) => x.nombre), yo, 'Elige tu nombre…') + '</select></div>' +
+              '<div class="field"><textarea id="com-texto" maxlength="500" required ' +
+                'placeholder="Escribe tu comentario…" style="min-height:84px"></textarea></div>' +
+              '<div id="com-aviso"></div>' +
+              '<button class="btn btn-primary" type="submit" style="justify-self:start">Comentar</button>' +
+            '</form>'
+          : '<div class="alert alert-warn"><div><b>Los comentarios y las reacciones aún no están activados</b>' +
+            'Se activan en cuanto se ejecute la migración 4 en Supabase (la hace quien lleva la web).</div></div>') +
+      '</div>' +
+    '</div>');
+
+    enganchesGaleria();
+    engancharNoticia(n, imgs);
+  }
+
+  function engancharNoticia(n, imgs) {
+    /* reacciones: pulsar pone, volver a pulsar quita */
+    $$('.reac-btn').forEach((b) => b.addEventListener('click', async () => {
+      const yo = await pedirYo();
+      if (!yo) return;
+      const tipo = b.dataset.tipo;
+      const ya = S.d.reacciones.find((r) => String(r.noticia_id) === String(n.id) && r.autor === yo && r.tipo === tipo);
+      try {
+        if (ya) await DB.borrar('reacciones', ya.id);
+        else {
+          const nueva = await DB.crear('reacciones', { noticia_id: n.id, autor: yo, tipo });
+          propio(nueva && nueva.id);
+        }
+        await recargar();
+        vNoticia();
+      } catch (err) {
+        if (/duplicate|23505|409/i.test(err.message || '')) { await recargar(); vNoticia(); return; }
+        U.toast(esMigracion(err.message) ? 'Faltan activar las reacciones (migración 4).' : (err.message || 'No se pudo guardar.'), 'err');
+      }
+    }));
+
+    /* comentar */
+    const f = $('#f-comentar');
+    if (f) f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nombre = $('#com-nombre').value, texto = $('#com-texto').value.trim();
+      const aviso = $('#com-aviso');
+      const v = U.comprobarNombre(nombre);
+      if (!v.ok) { aviso.innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>'; return; }
+      if (!texto) { aviso.innerHTML = '<div class="alert alert-err"><div>Escribe algo.</div></div>'; return; }
+      const btn = f.querySelector('button[type=submit]');
+      btn.disabled = true;
+      try {
+        const nuevo = await DB.crear('comentarios', { noticia_id: n.id, autor: nombre, texto });
+        propio(nuevo && nuevo.id);
+        setYo(nombre);
+        await recargar();
+        vNoticia();
+        const lista = document.querySelector('.com-lista');
+        if (lista && lista.lastElementChild) lista.lastElementChild.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        U.toast('Comentario publicado.', 'ok');
+      } catch (err) {
+        btn.disabled = false;
+        aviso.innerHTML = '<div class="alert alert-err"><div>' +
+          U.esc(esMigracion(err.message) ? 'Faltan activar los comentarios (migración 4).' : (err.message || 'No se pudo comentar.')) +
+          '</div></div>';
+      }
+    });
+
+    /* compartir: la imagen de portada se descarga ya, para que al pulsar el
+       móvil la tenga lista (Safari exige compartir en el mismo toque) */
+    const url = enlaceNoticia(n.id);
+    const medio = (n.diario || '').trim();
+    const resumen = recortar(n.cuerpo, 220);
+    const texto = (medio ? '📰 ' + medio + '\n' : '') + '*' + n.titulo + '*' +
+      (resumen ? '\n\n' + resumen : '') + '\n\nLéela entera 👉 ' + url;
+
+    let archivo = null;
+    if (imgs[0]) {
+      fetch(imgs[0]).then((r) => r.blob()).then((b) => {
+        const ext = (b.type.split('/')[1] || 'jpeg').replace('jpeg', 'jpg');
+        archivo = new File([b], 'noticia-avefenix.' + ext, { type: b.type || 'image/jpeg' });
+      }).catch(() => { archivo = null; });
+    }
+
+    const copiar = async (txt, ok) => {
+      try { await navigator.clipboard.writeText(txt); U.toast(ok, 'ok'); }
+      catch (e) { window.prompt('Copia esto:', txt); }
+    };
+    $('#n-copiar').addEventListener('click', () => copiar(url, 'Enlace copiado.'));
+
+    $('#n-compartir').addEventListener('click', async () => {
+      if (navigator.share) {
+        const conImagen = archivo && navigator.canShare && navigator.canShare({ files: [archivo] });
+        try {
+          await navigator.share(conImagen
+            ? { files: [archivo], text: texto, title: n.titulo }
+            : { text: texto, title: n.titulo });
+          return;
+        } catch (e) {
+          if (e && e.name === 'AbortError') return;      // lo cerró el usuario
+        }
+      }
+      /* ordenador o navegador sin menú de compartir */
+      const cerrar = U.modal(
+        '<div class="eyebrow">Compartir</div>' +
+        '<h3 style="margin:.6rem 0 .8rem;font-size:1.2rem">Manda esta noticia</h3>' +
+        '<div class="grid" style="gap:.6rem">' +
+          '<a class="btn btn-primary btn-block" target="_blank" rel="noopener" href="https://wa.me/?text=' +
+            encodeURIComponent(texto) + '">💬 Enviar por WhatsApp</a>' +
+          '<button class="btn btn-block" id="cm-texto">📋 Copiar texto y enlace</button>' +
+          '<button class="btn btn-block" id="cm-url">🔗 Copiar solo el enlace</button>' +
+        '</div>' +
+        '<p class="tiny muted" style="margin-top:1rem">Desde el móvil se manda también la imagen de portada.</p>');
+      $('#cm-texto').addEventListener('click', () => { copiar(texto, 'Texto copiado.'); cerrar(); });
+      $('#cm-url').addEventListener('click', () => { copiar(url, 'Enlace copiado.'); cerrar(); });
+    });
   }
 
   function itemGaleria(g) {
@@ -1459,7 +1718,7 @@
             '<input type="text" id="n-diario" maxlength="60" placeholder="El Diario del Valor, Radio Stake…">' +
             '<div class="hint">Opcional. Sale como cabecera de la noticia.</div></div>' +
           '<div class="field"><label>Titular</label><input type="text" id="n-titulo" maxlength="110" placeholder="El Partido del Valor promete bajar el stake" required></div>' +
-          '<div class="field"><label>Cuerpo</label><textarea id="n-cuerpo" maxlength="1200" placeholder="Desarrolla la noticia…"></textarea></div>' +
+          '<div class="field"><label>Cuerpo</label><textarea id="n-cuerpo" maxlength="1200" placeholder="Desarrolla la noticia… (opcional, puede ir solo el titular)"></textarea></div>' +
           '<div class="field"><label>Imágenes</label><input type="file" id="n-img" accept="image/*" multiple>' +
             '<div class="hint">Hasta 8. Si pones varias, se pasan en carrusel.</div></div>' +
           '<div id="n-aviso"></div>' +
@@ -2037,6 +2296,7 @@
             tab('galeria', 'Galería (' + S.d.galeria.length + ')') +
             tab('preguntas', 'Preguntas (' + S.d.preguntas.length + ')') +
             tab('debate', 'Debate (' + S.d.debate.length + ')') +
+            tab('comentarios', 'Comentarios (' + S.d.comentarios.length + ')') +
             tab('votos', 'Votos (' + S.d.votos.length + ')') +
           '</div><div id="mod-body"></div></div>' +
       '</div></div>');
@@ -2069,6 +2329,10 @@
       galeria: () => S.d.galeria.map((g) => modFila('galeria', g.id, g.titulo || 'Sin título', g.autor + ' · ' + U.hace(g.created_at))),
       preguntas: () => S.d.preguntas.map((p) => modFila('preguntas', p.id, p.texto.slice(0, 70), p.autor)),
       debate: () => S.d.debate.map((p) => modFila('debate_preguntas', p.id, p.texto.slice(0, 70), p.autor)),
+      comentarios: () => S.d.comentarios.map((k) => {
+        const nt = S.d.noticias.find((x) => String(x.id) === String(k.noticia_id));
+        return modFila('comentarios', k.id, String(k.texto).slice(0, 70), k.autor + ' en «' + (nt ? nt.titulo.slice(0, 40) : 'noticia borrada') + '»');
+      }),
       votos: () => S.d.votos.map((v) => modFila('votos', v.id, v.votante, 'votó a ' + nomCand(v.candidato_id)))
     };
 

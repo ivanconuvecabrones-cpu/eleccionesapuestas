@@ -118,6 +118,16 @@ window.CONFIG = {
       opciones: ['La meto yo primero y luego la paso', 'La paso antes y espero a que el grupo la confirme', 'La paso y la meto a la vez, sin esperar a nadie'] }
   ],
 
+  /* ---------- 9b. REACCIONES A LAS NOTICIAS ---------- */
+  REACCIONES: [
+    { tipo: 'like',    ico: '👍', nombre: 'Me gusta' },
+    { tipo: 'corazon', ico: '❤️', nombre: 'Me encanta' },
+    { tipo: 'fuego',   ico: '🔥', nombre: 'Fuego' }
+  ],
+
+  /* Dirección pública de la web: la usan los enlaces al compartir */
+  URL_WEB: 'https://ivanconuvecabrones-cpu.github.io/eleccionesapuestas/',
+
   /* ---------- 10. TEMAS DEL DEBATE ---------- */
   TEMAS_DEBATE: [
     { titulo: 'Gestión del bankroll',        desc: '¿Unidad fija o stake variable? ¿Cuánto se arriesga al día?' },

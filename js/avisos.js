@@ -35,8 +35,37 @@
     { tabla: 'preguntas', ico: '❓',
       titulo: () => 'Pregunta nueva',
       texto: (r) => r.texto,
-      ruta: () => '/preguntas' }
+      ruta: () => '/preguntas' },
+
+    /* Estos dos son personales: solo avisan si es tu noticia, o si ya habías
+       comentado en ella. Para saber quién eres, hay que haber elegido tu nombre
+       (al comentar o en la campanita). */
+    { tabla: 'comentarios', ico: '💬',
+      paraMi: (r, ctx) => {
+        const n = ctx.noticias[r.noticia_id];
+        if (!n || !ctx.yo || r.autor === ctx.yo) return false;
+        return n.autor === ctx.yo ||
+          ctx.comentarios.some((c) => c.noticia_id === r.noticia_id && c.autor === ctx.yo);
+      },
+      titulo: (r) => r.autor + ' ha comentado',
+      texto: (r, ctx) => '«' + ((ctx.noticias[r.noticia_id] || {}).titulo || 'una noticia') + '»: ' + r.texto,
+      ruta: (r) => '/noticia/' + r.noticia_id },
+    { tabla: 'reacciones', ico: '❤️',
+      paraMi: (r, ctx) => {
+        const n = ctx.noticias[r.noticia_id];
+        return !!(n && ctx.yo && n.autor === ctx.yo && r.autor !== ctx.yo);
+      },
+      titulo: (r) => r.autor + ' ha reaccionado ' + emojiDe(r.tipo),
+      texto: (r, ctx) => '«' + ((ctx.noticias[r.noticia_id] || {}).titulo || 'una noticia') + '»',
+      ruta: (r) => '/noticia/' + r.noticia_id }
   ];
+
+  const K_YO = 'avefenix:yo';
+  const yoActual = () => { try { return localStorage.getItem(K_YO) || ''; } catch (e) { return ''; } };
+  const emojiDe = (tipo) => {
+    const t = (window.CONFIG.REACCIONES || []).find((x) => x.tipo === tipo);
+    return t ? t.ico : '👍';
+  };
 
   /* ---------- almacenamiento a prueba de fallos ---------- */
   const leer = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -134,19 +163,29 @@
       const nuevas = [];
       const baseline = primeraVez && !vistos.size;
 
+      /* primero se traen todas las tablas; así los comentarios y las reacciones
+         pueden saber de qué noticia son */
+      const datos = {};
       for (const f of FUENTES) {
-        let filas = [];
-        try { filas = (await DB.listar(f.tabla, { orden: 'created_at' })) || []; }
-        catch (e) { continue; }
-        filas.slice(0, 40).forEach((r) => {
-          const ev = {
-            id: r.id, ico: f.ico, titulo: f.titulo(r), texto: f.texto(r),
-            ruta: f.ruta(r), ts: new Date(r.created_at).getTime() || 0
-          };
-          todos.push(ev);
+        if (DB.sinTabla && DB.sinTabla[f.tabla]) { datos[f.tabla] = []; continue; }   // migración sin ejecutar
+        try { datos[f.tabla] = (await DB.listar(f.tabla, { orden: 'created_at' })) || []; }
+        catch (e) { datos[f.tabla] = []; }          // tabla que aún no existe: se ignora
+      }
+      const ctx = { yo: yoActual(), noticias: {}, comentarios: datos.comentarios || [] };
+      (datos.noticias || []).forEach((n) => { ctx.noticias[n.id] = n; });
+
+      for (const f of FUENTES) {
+        (datos[f.tabla] || []).slice(0, 60).forEach((r) => {
+          const visible = f.paraMi ? f.paraMi(r, ctx) : true;
+          if (visible) {
+            todos.push({
+              id: r.id, ico: f.ico, titulo: f.titulo(r, ctx), texto: f.texto(r, ctx),
+              ruta: f.ruta(r), ts: new Date(r.created_at).getTime() || 0
+            });
+          }
           if (!vistos.has(r.id)) {
             vistos.add(r.id);
-            if (!baseline && !propios.has(r.id)) nuevas.push(ev);
+            if (visible && !baseline && !propios.has(r.id)) nuevas.push(todos[todos.length - 1]);
           }
         });
       }
@@ -216,6 +255,11 @@
       '<div class="eyebrow">Novedades</div>' +
       '<h3 style="margin:.6rem 0 .8rem;font-size:1.3rem">🔔 Lo último</h3>' +
       '<div class="avisos-lista">' + lista + '</div>' +
+      '<div class="field" style="margin-top:1.1rem"><label>Soy…</label><select id="av-yo">' +
+        '<option value="">Sin elegir</option>' +
+        window.CONFIG.MIEMBROS.map((m) => '<option value="' + U.esc(m.nombre) + '"' +
+          (m.nombre === yoActual() ? ' selected' : '') + '>' + U.esc(m.nombre) + '</option>').join('') +
+      '</select><div class="hint">Para avisarte cuando comenten o reaccionen a tus noticias.</div></div>' +
       '<div class="grid" style="gap:.7rem;margin-top:1.1rem">' + bloqueAvisos() + bloqueInstalar() + '</div>' +
       '<p class="tiny muted" style="margin-top:.9rem">Los avisos llegan mientras la app esté abierta o en segundo plano. ' +
         'Si la cierras del todo, te enteras de lo que te hayas perdido en cuanto la abras.</p>');
@@ -224,6 +268,11 @@
       cerrar();
       document.dispatchEvent(new CustomEvent('avisos:ir', { detail: it.dataset.ruta }));
     }));
+
+    const yoSel = document.getElementById('av-yo');
+    if (yoSel) yoSel.addEventListener('change', () => {
+      try { localStorage.setItem(K_YO, yoSel.value); } catch (e) { /* sin almacenamiento */ }
+    });
 
     const act = document.getElementById('av-activar');
     if (act) act.addEventListener('click', async () => {

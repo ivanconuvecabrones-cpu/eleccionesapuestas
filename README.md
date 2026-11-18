@@ -28,6 +28,9 @@ Somos **11**: 11 escaños y mayoría absoluta en **6**.
 - `supabase/migracion-3.sql` — nombre del diario y varias imágenes por noticia.
   **Pendiente.** Hasta que se ejecute, las noticias se guardan igual pero sin el
   nombre del diario y solo con la primera imagen (la web avisa al publicar).
+- `supabase/migracion-4.sql` — comentarios y reacciones en las noticias.
+  **Pendiente.** Hasta que se ejecute, las noticias se leen y se comparten, pero en
+  vez de comentarios y reacciones sale un aviso.
 
 ## Lo que falta
 
@@ -206,3 +209,22 @@ eso exige un servidor que los empuje; en cuanto se abre, se entera de todo lo qu
 se haya perdido. En iPhone solo funcionan con la app instalada.
 
 Archivos: `manifest.webmanifest`, `sw.js` y `js/avisos.js`.
+
+
+## Noticias: leer, reaccionar, comentar y compartir
+
+- En el muro cada noticia sale resumida, con «Leer más». Al pincharla se abre la
+  noticia entera con todas sus imágenes en carrusel.
+- Cada uno puede reaccionar con 👍 ❤️ 🔥 (otra pulsación la quita) y comentar,
+  eligiendo su nombre, que se queda guardado en ese dispositivo. No hace falta código.
+- **Compartir** manda por WhatsApp (o lo que elijas) la imagen de portada con el
+  título, un trozo del texto y el enlace. En ordenador, o si el navegador no tiene
+  menú de compartir, sale una ventana para enviarlo por WhatsApp Web o copiarlo.
+- El cuerpo de la noticia es opcional: puede ir solo el titular.
+- Avisos personales: te llega una notificación cuando alguien comenta o reacciona
+  a una noticia tuya, o comenta donde tú ya habías comentado. Hay que haber elegido
+  tu nombre (al comentar, o en la campanita → «Soy…»).
+
+Limitación al compartir: el enlace es a la web entera con la noticia dentro, y los
+chats solo pintan una vista previa genérica de la web. Por eso la imagen de portada
+y el texto viajan como adjunto, no dentro del enlace.

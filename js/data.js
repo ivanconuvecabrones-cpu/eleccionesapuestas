@@ -97,6 +97,7 @@
   const DB = {
     live: LIVE,
     modo: LIVE ? 'supabase' : 'demo',
+    sinTabla: {},   /* comentarios / reacciones: true si la migración 4 no está ejecutada */
     faltan: {},     /* columnas que aún no existen en la base (migración pendiente) */
 
     /* ---- lectura ---- */
@@ -278,11 +279,19 @@
         this.listar('votos'),
         this.listar('sondeo'),
         this.listar('debate_preguntas'),
-        this.ajustes()
+        this.ajustes(),
+        this.listar('comentarios', { orden: 'created_at', asc: true }),
+        this.listar('reacciones', { orden: 'created_at', asc: true })
       ];
-      const [candidatos, noticias, galeria, preguntas, respuestas, votos, sondeo, debate, ajustes] =
-        await Promise.all(peticiones.map((p) => p.catch(() => [])));
+      /* las dos últimas son opcionales: si la tabla no existe todavía, no pasa nada */
+      const hechas = await Promise.all(peticiones.map((p, i) =>
+        p.then((v) => ({ ok: true, v })).catch(() => ({ ok: false, v: [], i }))));
+      DB.sinTabla.comentarios = !hechas[9].ok;
+      DB.sinTabla.reacciones = !hechas[10].ok;
+      const [candidatos, noticias, galeria, preguntas, respuestas, votos, sondeo, debate, ajustes,
+        comentarios, reacciones] = hechas.map((h) => h.v);
       return {
+        comentarios: comentarios || [], reacciones: reacciones || [],
         candidatos: candidatos || [], noticias: noticias || [], galeria: galeria || [],
         preguntas: preguntas || [], respuestas: respuestas || [], votos: votos || [],
         sondeo: sondeo || [], debate: debate || [],
