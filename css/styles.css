@@ -119,7 +119,7 @@ h3{font-size:1.15rem;font-weight:700;letter-spacing:-.01em}
 .nav-burger{display:none;margin-left:auto;background:var(--panel);border:1px solid var(--line);
   border-radius:11px;width:42px;height:42px;cursor:pointer;font-size:1.2rem}
 
-@media (max-width:980px){
+@media (max-width:1100px){
   .nav-burger{display:grid;place-items:center}
   .nav-links{
     position:fixed;inset:66px 0 auto;flex-direction:column;background:rgba(13,13,14,.98);
@@ -660,4 +660,76 @@ tr.fila-casa td{background:rgba(255,255,255,.035)}
 @media (max-width:380px){
   .cd-num{font-size:1.25rem}
   .poster-name{font-size:1.4rem}
+}
+
+
+/* ---------- edición de candidatura ---------- */
+.mis-fotos{display:flex;gap:.6rem;flex-wrap:wrap}
+.mi-foto{position:relative;width:88px;height:88px;border-radius:12px;overflow:hidden;
+  border:1px solid var(--line);background:var(--bg-3)}
+.mi-foto img{width:100%;height:100%;object-fit:cover}
+.mi-foto-x{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;
+  background:rgba(8,8,9,.9);border:1px solid var(--line-strong);color:#fff;cursor:pointer;
+  font-size:.72rem;display:grid;place-items:center;line-height:1}
+.mi-foto-x:hover{background:var(--crimson);border-color:var(--crimson)}
+label.check{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:.82rem;
+  font-weight:600;color:var(--ink-2);cursor:pointer}
+label.check input{width:auto;accent-color:var(--fire)}
+
+
+/* ---------- noticias: cabecera de diario y carrusel de imágenes ---------- */
+.news-medio{
+  display:inline-block;font-family:var(--font-display);text-transform:uppercase;
+  letter-spacing:.07em;font-size:.86rem;color:var(--amber);
+  border-bottom:2px solid var(--amber);padding-bottom:.15rem;margin-bottom:.75rem;
+}
+.carrusel-noticia{margin-bottom:.8rem}
+.carrusel-noticia .carrusel{gap:.5rem}
+.carrusel-noticia .carrusel-item{width:100%;aspect-ratio:16/10}
+.carrusel-noticia .carrusel-nav{width:32px;height:32px;font-size:1rem}
+.carrusel-noticia .carrusel-nav.izq{left:6px}
+.carrusel-noticia .carrusel-nav.der{right:6px}
+@media(max-width:700px){
+  .carrusel-noticia .carrusel-nav{display:grid}
+  .carrusel-noticia .carrusel-item{width:100%}
+}
+
+
+/* ---------- campanita y avisos ---------- */
+.nav-bell{
+  position:relative;flex-shrink:0;width:42px;height:42px;border-radius:11px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);font-size:1.1rem;display:grid;place-items:center;
+  margin-left:.4rem;transition:.15s;
+}
+.nav-bell:hover{background:var(--panel-2)}
+.nav-links{order:3}
+.nav-bell{order:4}
+.nav-bell-n{
+  position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;
+  background:var(--crimson);color:#fff;font-size:.68rem;font-weight:800;display:grid;place-items:center;
+  border:2px solid var(--bg);
+}
+.nav-bell-n[hidden]{display:none}
+@media(max-width:1100px){
+  .nav-bell{margin-left:auto;order:0}
+  .nav-burger{margin-left:.5rem}
+}
+
+.avisos-lista{display:grid;gap:.1rem;max-height:46vh;overflow-y:auto;margin:0 -.3rem;padding:0 .3rem}
+.aviso-item{
+  display:flex;gap:.8rem;padding:.75rem .6rem;border-radius:12px;cursor:pointer;
+  border:1px solid transparent;transition:.15s;
+}
+.aviso-item:hover{background:var(--panel);border-color:var(--line)}
+.aviso-item.nuevo{background:rgba(255,107,26,.09);border-color:rgba(255,107,26,.3)}
+.aviso-ico{
+  width:38px;height:38px;border-radius:11px;background:var(--panel-2);display:grid;
+  place-items:center;font-size:1.1rem;flex-shrink:0;
+}
+.aviso-t{font-weight:750;font-size:.9rem}
+.aviso-x{color:var(--ink-2);font-size:.84rem;overflow:hidden;text-overflow:ellipsis;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+@media (min-width:1101px){
+  .nav-link{padding:.5rem .65rem}
 }

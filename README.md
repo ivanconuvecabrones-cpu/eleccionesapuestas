@@ -25,6 +25,9 @@ Somos **11**: 11 escaños y mayoría absoluta en **6**.
 
 - `supabase/schema.sql` — las tablas y el bucket. **Ejecutada.**
 - `supabase/migracion-2.sql` — vídeo de campaña y emblema. **Ejecutada.**
+- `supabase/migracion-3.sql` — nombre del diario y varias imágenes por noticia.
+  **Pendiente.** Hasta que se ejecute, las noticias se guardan igual pero sin el
+  nombre del diario y solo con la primera imagen (la web avisa al publicar).
 
 ## Lo que falta
 
@@ -162,7 +165,9 @@ avefenix-elecciones/
 | Foto de campaña | imagen | 12 MB, se recorta vertical (5:7) |
 | Emblema del partido | imagen cuadrada | 12 MB (o eliges un emoji) |
 | Programa electoral | PDF | 25 MB |
-| Vídeo de campaña | vídeo | 45 MB y minuto y medio |
+| Vídeo de campaña | vídeo | 3 minutos y 50 MB |
+| Fotos de la candidatura | imágenes (varias) | 12 MB cada una |
+| Imágenes de una noticia | hasta 8 imágenes | 12 MB cada una |
 
 Las imágenes se reducen solas antes de subirse, así que no hace falta que
 nadie se preocupe por el tamaño.
@@ -172,3 +177,32 @@ nadie se preocupe por el tamaño.
 Está en `img/`. `logo.png` es el grande del inicio, `logo-96.png` el de la
 barra y `favicon.png` el de la pestaña. Se les quitó el fondo negro, así que
 se pueden poner sobre cualquier fondo oscuro.
+
+
+---
+
+## Códigos: solo para votar y para editar
+
+Para presentar una candidatura, publicar en el muro, opinar en el sondeo o
+preguntar basta con **elegir tu nombre**. El código personal solo se pide para:
+
+1. **Votar.**
+2. **Editar tu candidatura** (botón «Editar mi candidatura» en tu ficha).
+
+Ojo: al no haber código en el resto, cualquiera puede elegir el nombre de otro
+al publicar una noticia o responder una pregunta. Es lo que se decidió, y para un
+grupo de amigos vale; si algún día molesta, se vuelve a pedir en un minuto.
+
+## App y avisos
+
+La web se puede **instalar como app** (Android: menú del navegador →
+«Instalar app»; iPhone: Compartir → «Añadir a pantalla de inicio») y tiene una
+campanita 🔔 arriba con las novedades: candidaturas, noticias, imágenes y
+preguntas nuevas.
+
+Los avisos del sistema se activan desde la campanita y llegan **mientras la app
+esté abierta o en segundo plano**. Con la app cerrada del todo no llegan, porque
+eso exige un servidor que los empuje; en cuanto se abre, se entera de todo lo que
+se haya perdido. En iPhone solo funcionan con la app instalada.
+
+Archivos: `manifest.webmanifest`, `sw.js` y `js/avisos.js`.

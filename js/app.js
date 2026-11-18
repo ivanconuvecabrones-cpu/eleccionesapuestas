@@ -16,6 +16,7 @@
     param: '',
     test: {},             // respuestas del test del votante
     testPaso: 0,
+    editando: null,       // id de la candidatura que se está editando (ya con código)
     cmp: [],              // candidatos elegidos en el comparador
     admin: sessionStorage.getItem('avefenix:admin') === '1'
   };
@@ -75,6 +76,27 @@
     await recargar();
     window.addEventListener('hashchange', enrutar);
     enrutar();
+    arrancarApp();
+  }
+
+  /* App instalable + avisos de novedades */
+  function arrancarApp() {
+    const ir2 = (ruta) => recargar().then(() => ir(ruta || '/')).catch(() => ir(ruta || '/'));
+
+    if ('serviceWorker' in navigator &&
+        (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.addEventListener('message', (e) => {
+        if (e.data && e.data.tipo === 'abrir') ir2(e.data.ruta);
+      });
+    }
+
+    document.addEventListener('avisos:ir', (e) => ir2(e.detail));
+
+    if (window.AVISOS) {
+      /* si llega algo nuevo, ponemos los datos al día sin tocar lo que se esté escribiendo */
+      window.AVISOS.iniciar({ alRecibir: () => recargar() });
+    }
   }
 
   async function recargar() {
@@ -111,11 +133,12 @@
     S.ruta = '/' + (partes[0] || '');
     S.param = partes[1] || '';
     marcarNav();
+    if (S.ruta !== '/editar') S.editando = null;
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     const vistas = {
       '/': vInicio, '/candidatos': vCandidatos, '/candidato': vCandidato,
-      '/presentar': vPresentar, '/comparar': vComparar, '/test': vTest,
+      '/presentar': vPresentar, '/editar': vEditar, '/comparar': vComparar, '/test': vTest,
       '/sondeo': vSondeo, '/debate': vDebate, '/muro': vMuro,
       '/preguntas': vPreguntas, '/votar': vVotar, '/resultados': vResultados,
       '/admin': vAdmin
@@ -206,9 +229,10 @@
                   ? noticias.map(function (n) {
                       const c = cand(n.candidato_id);
                       return '<div class="wall-item">' +
-                        (n.imagen_url ? '<img class="wall-thumb zoom" src="' + U.escUrl(n.imagen_url) +
-                          '" data-img="' + U.escUrl(n.imagen_url) + '" alt="" loading="lazy">' : '') +
+                        (imagenesNoticia(n)[0] ? '<img class="wall-thumb zoom" src="' + U.escUrl(imagenesNoticia(n)[0]) +
+                          '" data-img="' + U.escUrl(imagenesNoticia(n)[0]) + '" alt="" loading="lazy">' : '') +
                         '<div style="min-width:0">' +
+                          (n.diario ? '<div class="news-medio" style="margin-bottom:.35rem;font-size:.72rem">' + U.esc(n.diario) + '</div>' : '') +
                           '<div style="font-weight:750;line-height:1.25">' + U.esc(n.titulo) + '</div>' +
                           '<div class="tiny muted" style="margin-top:.25rem">' + U.esc(n.autor || '') +
                             (c ? ' · ' + U.esc(c.partido || c.nombre) : '') + ' · ' + U.hace(n.created_at) + '</div>' +
@@ -472,6 +496,7 @@
               '" target="_blank" rel="noopener">📄 Ver programa en PDF</a>' : '') +
             (c.video_url ? '<button class="btn btn-sm" id="ver-video">🎬 Ver su vídeo</button>' : '') +
             '<a class="btn btn-sm" data-ruta="/comparar">⚖️ Comparar con otros</a>' +
+            '<a class="btn btn-sm btn-ghost" data-ruta="/editar/' + U.esc(c.id) + '">✏️ Editar mi candidatura</a>' +
             (S.f.voto === 'abierta' ? '<a class="btn btn-fire btn-sm" data-ruta="/votar">🗳️ Votarle</a>' : '') +
           '</div>' +
         '</div>' +
@@ -570,8 +595,19 @@
   const tab = (id, txt, act) => '<div class="tab' + (act ? ' active' : '') + '" data-tab="' + id + '">' + txt + '</div>';
 
   /* ============================================================
-     VISTA · PRESENTAR CANDIDATURA
+     VISTA · PRESENTAR Y EDITAR CANDIDATURA
      ============================================================ */
+  const bloque = (titulo, cuerpo) =>
+    '<div class="card"><div class="eyebrow" style="margin-bottom:1.1rem">' + U.esc(titulo) + '</div>' + cuerpo + '</div>';
+
+  const campo = (lab, control, req, hint) =>
+    '<div class="field' + (/textarea|c-promesa|radio-list/.test(control) ? ' field-full' : '') + '">' +
+    '<label>' + U.esc(lab) + (req ? ' <span class="req">*</span>' : '') + '</label>' +
+    (hint ? '<div class="hint">' + U.esc(hint) + '</div>' : '') + control + '</div>';
+
+  /* lo que creo yo no me tiene que avisar a mí */
+  const propio = (id) => { if (window.AVISOS) window.AVISOS.propio(id); };
+
   function vPresentar() {
     if (S.f.candidatos !== 'abierta') {
       pinta('<div class="wrap section">' +
@@ -582,45 +618,107 @@
         '<div class="row" style="margin-top:1.2rem"><a class="btn btn-primary" data-ruta="/candidatos">Ver candidatos</a></div></div>');
       return;
     }
+    formCandidatura(null);
+  }
 
-    const yaSon = S.d.candidatos.map((c) => c.nombre);
+  /* Editar: primero el código, y después el mismo formulario ya relleno */
+  function vEditar() {
+    const c = cand(S.param);
+    if (!c) {
+      pinta('<div class="wrap section">' + U.vacio('🔍', 'Candidatura no encontrada', '') +
+        '<div class="row" style="justify-content:center;margin-top:1rem"><a class="btn" data-ruta="/candidatos">Volver a candidatos</a></div></div>');
+      return;
+    }
+    if (S.editando === String(c.id)) { formCandidatura(c); return; }
+
+    pinta('<div class="wrap section" style="max-width:460px">' +
+      '<div class="section-head"><div class="eyebrow">Editar candidatura</div>' +
+      '<h2 class="display">¿Es tu ficha?</h2>' +
+      '<p class="lead tiny">Para cambiar la candidatura de <b>' + U.esc(c.nombre) + '</b> hace falta su código personal.</p></div>' +
+      '<div class="card"><form id="f-edit" class="grid" style="gap:.9rem">' +
+        '<div class="field"><label>Tu código personal</label>' +
+          '<input type="password" id="e-codigo" placeholder="AVE-········" autocomplete="off" required></div>' +
+        '<div id="e-aviso"></div>' +
+        '<button class="btn btn-primary btn-block" type="submit">Entrar a editar</button>' +
+        '<a class="btn btn-sm btn-ghost btn-block" data-ruta="/candidato/' + U.esc(c.id) + '">Cancelar</a>' +
+      '</form></div></div>');
+
+    $('#f-edit').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const v = await U.validarMiembro(c.nombre, $('#e-codigo').value);
+      if (!v.ok) {
+        $('#e-aviso').innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>';
+        return;
+      }
+      S.editando = String(c.id);
+      formCandidatura(c);
+    });
+  }
+
+  function formCandidatura(c) {
+    const ed = !!c;
+    const val = (x) => (x == null ? '' : x);
+    const yaSon = S.d.candidatos.map((x) => x.nombre);
     const libres = C.MIEMBROS.filter((m) => !yaSon.includes(m.nombre)).map((m) => m.nombre);
     const todos = C.MIEMBROS.map((m) => m.nombre);
+    const stats = (c && c.stats) || {};
+    const resp = (c && c.test_respuestas) || {};
+    const promesas = (c && Array.isArray(c.promesas)) ? c.promesas : [];
+
+    const colores = U.COLORES.slice();
+    if (c && c.color && colores.indexOf(c.color) < 0) colores.unshift(c.color);
+    const emojis = U.EMOJIS.slice();
+    if (c && c.emoji && emojis.indexOf(c.emoji) < 0) emojis.unshift(c.emoji);
+    const colorSel = (c && c.color) || colores[0];
+    const emojiSel = (c && c.emoji) || emojis[0];
+    const misFotos = ed ? S.d.galeria.filter((g) => String(g.candidato_id) === String(c.id)) : [];
+
+    const hayPrograma = ed && c.programa_url, hayVideo = ed && c.video_url;
 
     pinta('<div class="wrap section">' +
-      '<div class="section-head"><div class="eyebrow">Fase 1 · hasta el ' + U.fechaLarga(C.FECHAS.cierre_candidatos) + '</div>' +
-      '<h2 class="display">Presenta tu candidatura</h2>' +
-      '<p class="lead">Rellena tu ficha y aparecerás en la web con tu cartel, tu programa y tus números. ' +
-      'Necesitas tu código personal, el que se repartió por el grupo.</p></div>' +
+      '<div class="section-head"><div class="eyebrow">' +
+        (ed ? 'Editando tu candidatura' : 'Fase 1 · hasta el ' + U.fechaLarga(C.FECHAS.cierre_candidatos)) + '</div>' +
+      '<h2 class="display">' + (ed ? 'Edita tu candidatura' : 'Presenta tu candidatura') + '</h2>' +
+      '<p class="lead">' + (ed
+        ? 'Cambia lo que quieras. Lo que dejes sin tocar se queda como está, y los archivos solo se sustituyen si subes uno nuevo.'
+        : 'Rellena tu ficha y aparecerás en la web con tu cartel, tu programa y tus números. ' +
+          'No hace falta código para presentarte; lo necesitarás más adelante para editarla y para votar.') + '</p></div>' +
 
-      (libres.length ? '' : '<div class="alert alert-warn" style="margin-bottom:1.4rem"><div><b>Todos los miembros tienen ya candidatura</b>Si quieres rehacer la tuya, pídele al admin que la borre.</div></div>') +
+      ((!ed && !libres.length)
+        ? '<div class="alert alert-warn" style="margin-bottom:1.4rem"><div><b>Todos los miembros tienen ya candidatura</b>Si quieres rehacer la tuya, edítala desde su ficha.</div></div>'
+        : '') +
 
       '<form id="f-cand" class="grid" style="gap:1.6rem">' +
 
         bloque('1 · Quién eres', '<div class="form-grid">' +
-          campo('Tu nombre', '<select id="c-nombre" required>' + U.opciones(libres.length ? libres : todos, '', 'Elige tu nombre…') + '</select>', true) +
-          campo('Tu código personal', '<input type="password" id="c-codigo" placeholder="AVE-····" autocomplete="off" required>', true, 'El que te pasaron por el grupo.') +
-          campo('Alias', '<input type="text" id="c-alias" maxlength="28" placeholder="El Tiburón, El Profesor…">', false, 'Opcional, pero queda mejor en el cartel.') +
-          campo('Tu foto de campaña', '<input type="file" id="c-foto" accept="image/*">', false, 'Vertical queda mejor. Se recorta sola.') +
+          (ed
+            ? campo('Tu nombre', '<input type="text" id="c-nombre" value="' + U.esc(c.nombre) + '" disabled>', false)
+            : campo('Tu nombre', '<select id="c-nombre" required>' + U.opciones(libres.length ? libres : todos, '', 'Elige tu nombre…') + '</select>', true)) +
+          campo('Alias', '<input type="text" id="c-alias" maxlength="28" value="' + U.esc(val(c && c.alias)) + '" placeholder="El Tiburón, El Profesor…">', false, 'Opcional, pero queda mejor en el cartel.') +
+          campo('Tu foto de campaña',
+            ((ed && c.foto_url) ? '<img class="emblema-prev" src="' + U.escUrl(c.foto_url) + '" alt="Tu foto actual" style="margin-bottom:.5rem;width:64px;height:90px">' : '') +
+            '<input type="file" id="c-foto" accept="image/*">', false,
+            ed && c.foto_url ? 'Ya tienes una. Sube otra solo si quieres cambiarla.' : 'Vertical queda mejor. Se recorta sola.') +
         '</div>') +
 
         bloque('2 · Tu partido', '<div class="form-grid">' +
-          campo('Nombre del partido', '<input type="text" id="c-partido" maxlength="40" placeholder="Partido del Valor Esperado" required>', true) +
-          campo('Siglas', '<input type="text" id="c-siglas" maxlength="8" placeholder="PVE">', false, 'Máximo 8 caracteres.') +
-          campo('Lema de campaña', '<input type="text" id="c-lema" maxlength="90" placeholder="Menos corazonadas y más value" required>', true) +
+          campo('Nombre del partido', '<input type="text" id="c-partido" maxlength="40" value="' + U.esc(val(c && c.partido)) + '" placeholder="Partido del Valor Esperado" required>', true) +
+          campo('Siglas', '<input type="text" id="c-siglas" maxlength="8" value="' + U.esc(val(c && c.siglas)) + '" placeholder="PVE">', false, 'Máximo 8 caracteres.') +
+          campo('Lema de campaña', '<input type="text" id="c-lema" maxlength="90" value="' + U.esc(val(c && c.lema)) + '" placeholder="Menos corazonadas y más value" required>', true) +
           campo('Color del partido', '<div class="color-swatches" id="c-colores">' +
-            U.COLORES.map((col, i) => '<div class="swatch' + (i === 0 ? ' sel' : '') + '" data-color="' + col +
-              '" style="background:' + col + '"></div>').join('') + '</div>', true) +
+            colores.map((col) => '<div class="swatch' + (col === colorSel ? ' sel' : '') + '" data-color="' + U.esc(col) +
+              '" style="background:' + U.esc(col) + '"></div>').join('') + '</div>', true) +
           campo('Emblema del partido',
             '<div class="row" style="align-items:flex-start;gap:1rem;flex-wrap:nowrap">' +
-              '<img id="c-emblema-prev" class="emblema-prev" alt="" style="display:none">' +
+              '<img id="c-emblema-prev" class="emblema-prev" alt="" ' +
+                ((ed && c.emblema_url) ? 'src="' + U.escUrl(c.emblema_url) + '"' : 'style="display:none"') + '>' +
               '<div style="flex:1;min-width:0">' +
                 '<input type="file" id="c-emblema" accept="image/*">' +
                 '<div class="hint" style="margin:.5rem 0 .4rem">O elige uno de estos:</div>' +
                 '<div class="color-swatches" id="c-emojis">' +
-                U.EMOJIS.map((e, i) => '<div class="swatch' + (i === 0 ? ' sel' : '') +
-                  '" data-emoji="' + e + '" style="background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:1.1rem">' +
-                  e + '</div>').join('') + '</div>' +
+                emojis.map((e) => '<div class="swatch' + (e === emojiSel ? ' sel' : '') +
+                  '" data-emoji="' + U.esc(e) + '" style="background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:1.1rem">' +
+                  U.esc(e) + '</div>').join('') + '</div>' +
               '</div>' +
             '</div>',
             false, 'Sube tu escudo o logo. Cuadrado queda mejor.') +
@@ -628,44 +726,66 @@
 
         bloque('3 · Tu programa', '<div class="form-grid">' +
           campo('Qué vas a hacer de presidente',
-            '<textarea id="c-desc" maxlength="1800" placeholder="Explica tu proyecto: qué cambiarías, cómo gestionarías el grupo, qué aportas…" required></textarea>',
+            '<textarea id="c-desc" maxlength="1800" placeholder="Explica tu proyecto: qué cambiarías, cómo gestionarías el grupo, qué aportas…" required>' +
+              U.esc(val(c && c.descripcion)) + '</textarea>',
             true, 'Esto es lo que se lee en tu ficha. Entre 3 y 10 líneas está bien.') +
           campo('Tus 5 promesas',
-            [0, 1, 2, 3, 4].map((i) => '<input type="text" class="c-promesa" maxlength="110" placeholder="Promesa ' +
-              (i + 1) + '" style="margin-bottom:.5rem">').join(''),
+            [0, 1, 2, 3, 4].map((i) => '<input type="text" class="c-promesa" maxlength="110" value="' + U.esc(val(promesas[i])) +
+              '" placeholder="Promesa ' + (i + 1) + '" style="margin-bottom:.5rem">').join(''),
             false, 'Cortas y claras. Las que dejes vacías no se publican.') +
-          campo('Programa electoral en PDF', '<input type="file" id="c-pdf" accept="application/pdf">',
-            false, 'El documento largo y bien hecho, si lo tienes. Máximo 25 MB.') +
-          campo('Vídeo de campaña', '<input type="file" id="c-video" accept="video/*">',
-            false, 'Un minuto como mucho, grabado con el móvil vale. Máximo 45 MB.') +
+          campo('Programa electoral en PDF',
+            '<input type="file" id="c-pdf" accept="application/pdf">' +
+            (hayPrograma ? '<label class="check"><input type="checkbox" id="c-quitar-pdf"> Quitar el programa que ya tengo subido</label>' : ''),
+            false, hayPrograma ? 'Ya hay uno subido. Sube otro para sustituirlo. Máximo 25 MB.' : 'El documento largo y bien hecho, si lo tienes. Máximo 25 MB.') +
+          campo('Vídeo de campaña',
+            '<input type="file" id="c-video" accept="video/*">' +
+            (hayVideo ? '<label class="check"><input type="checkbox" id="c-quitar-video"> Quitar el vídeo que ya tengo subido</label>' : ''),
+            false, (hayVideo ? 'Ya hay uno subido. Sube otro para sustituirlo. ' : '') +
+              'Hasta 3 minutos y 50 MB. Grabado en 720p con el móvil entra de sobra.') +
           campo('Si no sales presidente, ¿a quién apoyarías?',
-            '<input type="text" id="c-apoyo" maxlength="60" placeholder="Nombre o partido">',
+            '<input type="text" id="c-apoyo" maxlength="60" value="' + U.esc(val(c && c.apoyo)) + '" placeholder="Nombre o partido">',
             false, 'Para los pactos. Opcional.') +
         '</div>') +
 
-        bloque('4 · Tu forma de apostar', '<div class="form-grid">' +
-          campo('Casa de apuestas favorita', '<select id="c-casa" required>' + U.opciones(C.CASAS, '', 'Elige una…') + '</select>', true) +
-          campo('Valor de 1 unidad (€)', '<input type="number" id="c-unidad" min="0.5" max="1000" step="0.5" placeholder="10" required>', true, 'Cuánto vale una unidad para ti.') +
-          campo('Bankroll que recomiendas (€)', '<input type="number" id="c-bankroll" min="0" max="100000" step="10" placeholder="500">', false, 'Opcional.') +
+        bloque('4 · Tus fotos', '<div class="form-grid">' +
+          (misFotos.length
+            ? '<div class="field field-full"><label>Las que ya tienes en tu galería</label>' +
+              '<div class="mis-fotos">' + misFotos.map((g) =>
+                '<div class="mi-foto"><img src="' + U.escUrl(g.url) + '" alt="" loading="lazy">' +
+                '<button type="button" class="mi-foto-x" data-id="' + U.esc(g.id) + '" aria-label="Quitar esta foto">✕</button></div>').join('') +
+              '</div></div>'
+            : '') +
+          '<div class="field field-full"><label>' + (misFotos.length ? 'Añadir más fotos' : 'Fotos de tu candidatura') + '</label>' +
+            '<div class="hint">Carteles, mítines, memes, lo que quieras. Puedes elegir varias a la vez; salen en el carrusel de tu ficha y en el muro.</div>' +
+            '<input type="file" id="c-fotos" accept="image/*" multiple>' +
+            '<div id="c-fotos-n" class="hint"></div></div>' +
+        '</div>') +
+
+        bloque('5 · Tu forma de apostar', '<div class="form-grid">' +
+          campo('Casa de apuestas favorita', '<select id="c-casa" required>' + U.opciones(C.CASAS, val(c && c.casa_apuestas), 'Elige una…') + '</select>', true) +
+          campo('Valor de 1 unidad (€)', '<input type="number" id="c-unidad" min="0.5" max="1000" step="0.5" value="' + U.esc(val(c && c.unidad)) + '" placeholder="10" required>', true, 'Cuánto vale una unidad para ti.') +
+          campo('Bankroll que recomiendas (€)', '<input type="number" id="c-bankroll" min="0" max="100000" step="10" value="' + U.esc(val(c && c.bankroll)) + '" placeholder="500">', false, 'Opcional.') +
           '<div class="field field-full"><label>Tus métricas <span class="req">*</span></label>' +
             '<div class="hint" style="margin-bottom:.9rem">Sé sincero, que luego se compara en la web y se te ve el plumero.</div>' +
             '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.1rem">' +
-            C.STATS.map((s) =>
-              '<div><label style="font-size:.8rem">' + s.icono + ' ' + U.esc(s.nombre) + '</label>' +
-              '<div class="hint" style="margin:.1rem 0 .4rem">' + U.esc(s.desc) + '</div>' +
-              '<div class="slider-row"><input type="range" class="c-stat" data-stat="' + s.clave +
-              '" min="1" max="10" step="1" value="5"><div class="slider-val">5</div></div></div>').join('') +
+            C.STATS.map((s) => {
+              const n = Number(stats[s.clave]) || 5;
+              return '<div><label style="font-size:.8rem">' + s.icono + ' ' + U.esc(s.nombre) + '</label>' +
+                '<div class="hint" style="margin:.1rem 0 .4rem">' + U.esc(s.desc) + '</div>' +
+                '<div class="slider-row"><input type="range" class="c-stat" data-stat="' + s.clave +
+                '" min="1" max="10" step="1" value="' + n + '"><div class="slider-val">' + n + '</div></div></div>';
+            }).join('') +
             '</div></div>' +
         '</div>') +
 
-        bloque('5 · Tu gabinete', '<p class="tiny muted" style="margin-bottom:1rem">A quién nombrarías ministro si ganas. Puedes dejarlo en blanco y decidirlo después.</p>' +
+        bloque('6 · Tu gabinete', '<p class="tiny muted" style="margin-bottom:1rem">A quién nombrarías ministro si ganas. Puedes dejarlo en blanco y decidirlo después.</p>' +
           '<div class="form-grid">' +
           C.MINISTERIOS.map((m) =>
             campo(m.icono + ' ' + m.nombre, '<select class="c-min" data-min="' + m.clave + '">' +
-              U.opciones(todos, '', 'Sin nombrar…') + '</select>', false)).join('') +
+              U.opciones(todos, val(c && c[m.clave]), 'Sin nombrar…') + '</select>', false)).join('') +
         '</div>') +
 
-        bloque('6 · Tus posiciones', '<p class="tiny muted" style="margin-bottom:1.2rem">' +
+        bloque('7 · Tus posiciones', '<p class="tiny muted" style="margin-bottom:1.2rem">' +
           'Estas son las mismas preguntas que responderán los votantes en el test de afinidad. ' +
           'Según lo que marques, el test dirá a quién se parece cada uno. Hay que responderlas todas.</p>' +
           '<div class="grid" style="gap:1.4rem">' +
@@ -673,32 +793,30 @@
             '<div><label>' + (i + 1) + '. ' + U.esc(q.pregunta) + ' <span class="req">*</span></label>' +
             '<div class="radio-list" data-q="' + q.id + '" style="margin-top:.5rem">' +
             q.opciones.map((o, j) =>
-              '<div class="radio-opt" data-val="' + j + '"><div class="radio-mark"></div><div>' + U.esc(o) + '</div></div>').join('') +
+              '<div class="radio-opt' + (String(resp[q.id]) === String(j) ? ' sel' : '') + '" data-val="' + j + '">' +
+              '<div class="radio-mark"></div><div>' + U.esc(o) + '</div></div>').join('') +
             '</div></div>').join('') +
           '</div>') +
 
         '<div class="card" style="position:sticky;bottom:1rem">' +
           '<div id="c-aviso"></div>' +
-          '<button type="submit" class="btn btn-primary btn-lg btn-block" id="c-enviar">🔥 Presentar mi candidatura</button>' +
-          '<p class="tiny muted" style="text-align:center;margin-top:.7rem">Una vez enviada, para cambiarla habla con el admin.</p>' +
+          '<button type="submit" class="btn btn-primary btn-lg btn-block" id="c-enviar">' +
+            (ed ? '💾 Guardar los cambios' : '🔥 Presentar mi candidatura') + '</button>' +
+          '<p class="tiny muted" style="text-align:center;margin-top:.7rem">' +
+            (ed ? '<a data-ruta="/candidato/' + U.esc(c.id) + '" style="text-decoration:underline;cursor:pointer">Cancelar y volver a mi ficha</a>'
+                : 'Podrás editarla cuando quieras desde tu ficha, con tu código personal.') + '</p>' +
         '</div>' +
       '</form>' +
     '</div>');
 
-    engancharFormCandidato();
+    engancharFormCandidato(c);
   }
 
-  const bloque = (titulo, cuerpo) =>
-    '<div class="card"><div class="eyebrow" style="margin-bottom:1.1rem">' + U.esc(titulo) + '</div>' + cuerpo + '</div>';
+  function engancharFormCandidato(c) {
+    const ed = !!c;
+    const etiquetaBoton = ed ? '💾 Guardar los cambios' : '🔥 Presentar mi candidatura';
 
-  const campo = (lab, control, req, hint) =>
-    '<div class="field' + (/textarea|c-promesa|radio-list/.test(control) ? ' field-full' : '') + '">' +
-    '<label>' + U.esc(lab) + (req ? ' <span class="req">*</span>' : '') + '</label>' +
-    (hint ? '<div class="hint">' + U.esc(hint) + '</div>' : '') + control + '</div>';
-
-  function engancharFormCandidato() {
-    /* swatches */
-    const swatch = (cont, attr) => {
+    const swatch = (cont) => {
       $$('#' + cont + ' .swatch').forEach((s) => s.addEventListener('click', () => {
         $$('#' + cont + ' .swatch').forEach((x) => x.classList.remove('sel'));
         s.classList.add('sel');
@@ -710,18 +828,34 @@
     const inEmbl = $('#c-emblema'), prevEmbl = $('#c-emblema-prev');
     if (inEmbl) inEmbl.addEventListener('change', () => {
       const f = inEmbl.files[0];
-      if (!f) { prevEmbl.style.display = 'none'; return; }
+      if (!f) return;
       prevEmbl.src = URL.createObjectURL(f);
       prevEmbl.style.display = 'block';
     });
 
-    /* sliders */
+    /* cuántas fotos ha elegido */
+    const inFotos = $('#c-fotos');
+    if (inFotos) inFotos.addEventListener('change', () => {
+      const n = inFotos.files.length;
+      $('#c-fotos-n').textContent = n ? n + (n === 1 ? ' foto elegida' : ' fotos elegidas') : '';
+    });
+
+    /* quitar una foto de la galería, ya mismo */
+    $$('.mi-foto-x').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('¿Quitar esta foto de tu galería?')) return;
+      try {
+        await DB.borrar('galeria', b.dataset.id);
+        S.d.galeria = S.d.galeria.filter((g) => String(g.id) !== b.dataset.id);
+        b.closest('.mi-foto').remove();
+        U.toast('Foto quitada.', 'ok');
+      } catch (err) { U.toast(err.message || 'No se pudo quitar.', 'err'); }
+    }));
+
     $$('.c-stat').forEach((r) => {
       const salida = r.parentElement.querySelector('.slider-val');
       r.addEventListener('input', () => { salida.textContent = r.value; });
     });
 
-    /* radios del test */
     $$('.radio-list').forEach((lista) => {
       $$('.radio-opt', lista).forEach((o) => o.addEventListener('click', () => {
         $$('.radio-opt', lista).forEach((x) => x.classList.remove('sel'));
@@ -736,16 +870,16 @@
       const fallo = (msg) => {
         aviso.innerHTML = '<div class="alert alert-err" style="margin-bottom:.9rem"><div>' + U.esc(msg) + '</div></div>';
         aviso.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        btn.disabled = false; btn.textContent = '🔥 Presentar mi candidatura';
+        btn.disabled = false; btn.textContent = etiquetaBoton;
       };
 
-      const nombre = $('#c-nombre').value;
-      const codigo = $('#c-codigo').value;
-      const v = await U.validarMiembro(nombre, codigo);
-      if (!v.ok) return fallo(v.error);
-
-      if (S.d.candidatos.some((c) => c.nombre === nombre)) {
-        return fallo('Ya hay una candidatura presentada con ese nombre.');
+      const nombre = ed ? c.nombre : $('#c-nombre').value;
+      if (!ed) {
+        const v = U.comprobarNombre(nombre);
+        if (!v.ok) return fallo(v.error);
+        if (S.d.candidatos.some((x) => x.nombre === nombre)) {
+          return fallo('Ya hay una candidatura presentada con ese nombre.');
+        }
       }
 
       const test = {};
@@ -755,28 +889,23 @@
         if (!sel) faltan++;
         else test[lista.dataset.q] = Number(sel.dataset.val);
       });
-      if (faltan) return fallo('Te quedan ' + faltan + ' pregunta' + (faltan === 1 ? '' : 's') + ' del bloque 6 sin responder.');
+      if (faltan) return fallo('Te quedan ' + faltan + ' pregunta' + (faltan === 1 ? '' : 's') + ' del bloque 7 sin responder.');
 
-      btn.disabled = true; btn.textContent = 'Enviando…';
+      btn.disabled = true; btn.textContent = ed ? 'Guardando…' : 'Enviando…';
       aviso.innerHTML = '';
 
       try {
         const stats = {};
         $$('.c-stat').forEach((r) => { stats[r.dataset.stat] = Number(r.value); });
 
-        let foto_url = null, programa_url = null, emblema_url = null, video_url = null;
         const ffoto = $('#c-foto').files[0];
         const fpdf = $('#c-pdf').files[0];
         const fembl = $('#c-emblema').files[0];
         const fvid = $('#c-video').files[0];
-        if (ffoto) { btn.textContent = 'Subiendo foto…'; foto_url = await DB.subir('fotos', ffoto); }
-        if (fembl) { btn.textContent = 'Subiendo emblema…'; emblema_url = await DB.subir('emblemas', fembl); }
-        if (fpdf) { btn.textContent = 'Subiendo programa…'; programa_url = await DB.subir('programas', fpdf); }
-        if (fvid) { btn.textContent = 'Subiendo vídeo… (puede tardar)'; video_url = await DB.subir('videos', fvid); }
+        const fotosExtra = Array.from($('#c-fotos').files || []);
 
-        btn.textContent = 'Guardando…';
         const fila = {
-          nombre, alias: $('#c-alias').value.trim() || null,
+          alias: $('#c-alias').value.trim() || null,
           partido: $('#c-partido').value.trim(),
           siglas: ($('#c-siglas').value.trim() || '').toUpperCase() || null,
           color: ($('#c-colores .swatch.sel') || {}).dataset?.color || U.COLORES[0],
@@ -788,17 +917,45 @@
           casa_apuestas: $('#c-casa').value,
           unidad: Number($('#c-unidad').value) || null,
           bankroll: Number($('#c-bankroll').value) || null,
-          stats, test_respuestas: test,
-          foto_url, programa_url, emblema_url, video_url
+          stats, test_respuestas: test
         };
+        if (!ed) fila.nombre = nombre;
         $$('.c-min').forEach((s) => { fila[s.dataset.min] = s.value || null; });
 
-        const creado = await DB.crear('candidatos', fila);
+        /* archivos: solo se tocan si se sube uno nuevo (o se pide quitarlo) */
+        if (ffoto) { btn.textContent = 'Subiendo foto…'; fila.foto_url = await DB.subir('fotos', ffoto); }
+        else if (!ed) fila.foto_url = null;
+
+        if (fembl) { btn.textContent = 'Subiendo emblema…'; fila.emblema_url = await DB.subir('emblemas', fembl); }
+        else if (!ed) fila.emblema_url = null;
+
+        if (fpdf) { btn.textContent = 'Subiendo programa…'; fila.programa_url = await DB.subir('programas', fpdf); }
+        else if ($('#c-quitar-pdf') && $('#c-quitar-pdf').checked) fila.programa_url = null;
+        else if (!ed) fila.programa_url = null;
+
+        if (fvid) { btn.textContent = 'Subiendo vídeo… (puede tardar)'; fila.video_url = await DB.subir('videos', fvid); }
+        else if ($('#c-quitar-video') && $('#c-quitar-video').checked) fila.video_url = null;
+        else if (!ed) fila.video_url = null;
+
+        btn.textContent = 'Guardando…';
+        let id;
+        if (ed) { await DB.actualizar('candidatos', c.id, fila); id = c.id; }
+        else { const creado = await DB.crear('candidatos', fila); id = creado.id; propio(id); }
+
+        /* las fotos de la candidatura van a la galería, con su candidato */
+        for (let i = 0; i < fotosExtra.length; i++) {
+          btn.textContent = 'Subiendo fotos (' + (i + 1) + '/' + fotosExtra.length + ')…';
+          const url = await DB.subir('galeria', fotosExtra[i]);
+          const g = await DB.crear('galeria', { autor: nombre, candidato_id: id, titulo: null, url });
+          if (g && g.id) propio(g.id);
+        }
+
+        S.editando = null;
         await recargar();
-        U.toast('¡Candidatura presentada! Ya estás en la papeleta.', 'ok');
-        ir('/candidato/' + creado.id);
+        U.toast(ed ? 'Cambios guardados.' : '¡Candidatura presentada! Ya estás en la papeleta.', 'ok');
+        ir('/candidato/' + id);
       } catch (err) {
-        fallo(err.message || 'Algo ha fallado al enviar la candidatura.');
+        fallo(err.message || 'Algo ha fallado al guardar la candidatura.');
       }
     });
   }
@@ -1070,11 +1227,10 @@
         '<div class="card">' +
           '<h3 style="margin-bottom:.4rem">🗳️ Di a quién votarías</h3>' +
           (S.f.sondeo === 'abierta'
-            ? '<p class="tiny muted" style="margin-bottom:1rem">Con tu nombre y tu código, para que cada uno cuente una vez.</p>' +
+            ? '<p class="tiny muted" style="margin-bottom:1rem">Elige tu nombre y a quién votarías. Cada uno cuenta una vez y puedes cambiarlo.</p>' +
               '<form id="f-sondeo" class="grid" style="gap:.9rem">' +
                 '<div class="field"><label>Tu nombre</label><select id="s-nombre" required>' +
                   U.opciones(C.MIEMBROS.map((x) => x.nombre), '', 'Elige tu nombre…') + '</select></div>' +
-                '<div class="field"><label>Tu código</label><input type="password" id="s-codigo" placeholder="AVE-····" autocomplete="off" required></div>' +
                 '<div class="field"><label>A quién votarías hoy</label><select id="s-cand" required>' +
                   U.opciones(cs.map((c) => ({ valor: c.id, texto: c.nombre + (c.partido ? ' · ' + c.partido : '') })), '', 'Elige candidato…') +
                 '</select></div>' +
@@ -1092,7 +1248,7 @@
     if (f) f.addEventListener('submit', async (e) => {
       e.preventDefault();
       const aviso = $('#s-aviso');
-      const v = await U.validarMiembro($('#s-nombre').value, $('#s-codigo').value);
+      const v = U.comprobarNombre($('#s-nombre').value);
       if (!v.ok) {
         aviso.innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>';
         return;
@@ -1201,7 +1357,7 @@
     pinta('<div class="wrap section">' +
       '<div class="section-head"><div class="eyebrow">Campaña</div>' +
       '<h2 class="display">El muro</h2>' +
-      '<p class="lead">Noticias de campaña, carteles y memes. Publican los candidatos y cualquier miembro con su código.</p></div>' +
+      '<p class="lead">Noticias de campaña, carteles y memes. Publica quien quiera: eliges tu nombre y listo.</p></div>' +
       '<div class="tabs" id="muro-tabs">' +
         tab('noticias', '📰 Noticias (' + S.d.noticias.length + ')', true) +
         tab('galeria', '🖼️ Galería (' + S.d.galeria.length + ')') +
@@ -1231,11 +1387,25 @@
     mostrar('noticias');
   }
 
+  /* Una noticia puede traer varias imágenes. Si la columna nueva aún no
+     existe en la base, se usa la imagen única de siempre. */
+  function imagenesNoticia(n) {
+    if (Array.isArray(n.imagenes) && n.imagenes.length) return n.imagenes.filter(Boolean);
+    return n.imagen_url ? [n.imagen_url] : [];
+  }
+
   function tarjetaNoticia(n) {
     const c = cand(n.candidato_id);
-    const col = c ? U.esc(c.color) : '#8b5cf6';
+    const col = c ? U.esc(c.color) : '#ff6b1a';
+    const imgs = imagenesNoticia(n);
+    const medio = (n.diario || '').trim();
     return '<div class="card news-card">' +
-      (n.imagen_url ? '<img src="' + U.escUrl(n.imagen_url) + '" alt="" loading="lazy" class="zoom" data-img="' + U.escUrl(n.imagen_url) + '">' : '') +
+      (medio ? '<div class="news-medio">' + U.esc(medio) + '</div>' : '') +
+      (imgs.length > 1
+        ? carrusel(imgs.map((u) => ({ url: u, titulo: '' })), 'carrusel-noticia')
+        : (imgs.length
+            ? '<img src="' + U.escUrl(imgs[0]) + '" alt="" loading="lazy" class="zoom" data-img="' + U.escUrl(imgs[0]) + '">'
+            : '')) +
       '<div class="news-meta"><span class="dot" style="background:' + col + '"></span>' +
         U.esc(n.autor || 'Anónimo') + (c ? ' · ' + U.esc(c.partido || c.nombre) : '') +
         ' · ' + U.hace(n.created_at) + '</div>' +
@@ -1251,11 +1421,12 @@
 
   /* ============ CARRUSEL DE IMÁGENES ============ */
   let carruselN = 0;
-  function carrusel(items) {
+  function carrusel(items, clase) {
     if (!items.length) return '';
     const id = 'carr' + (++carruselN);
-    return '<div class="carrusel-wrap">' +
-      (items.length > 2 ? '<button class="carrusel-nav izq" data-carr="' + id + '" data-dir="-1" aria-label="Anterior">‹</button>' : '') +
+    const flechas = items.length > (clase ? 1 : 2);
+    return '<div class="carrusel-wrap ' + (clase || '') + '">' +
+      (flechas ? '<button class="carrusel-nav izq" data-carr="' + id + '" data-dir="-1" aria-label="Anterior">‹</button>' : '') +
       '<div class="carrusel" id="' + id + '">' +
         items.map((g) =>
           '<div class="carrusel-item zoom" data-img="' + U.escUrl(g.url) + '" data-cap="' + U.esc(g.titulo || '') + '">' +
@@ -1263,7 +1434,7 @@
             (g.titulo ? '<div class="carrusel-cap">' + U.esc(g.titulo) + '</div>' : '') +
           '</div>').join('') +
       '</div>' +
-      (items.length > 2 ? '<button class="carrusel-nav der" data-carr="' + id + '" data-dir="1" aria-label="Siguiente">›</button>' : '') +
+      (flechas ? '<button class="carrusel-nav der" data-carr="' + id + '" data-dir="1" aria-label="Siguiente">›</button>' : '') +
     '</div>';
   }
 
@@ -1283,14 +1454,17 @@
   function formPublicar() {
     return '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
       '<div class="card"><h3 style="margin-bottom:.4rem">📰 Publicar una noticia</h3>' +
-        '<p class="tiny muted" style="margin-bottom:1rem">Un titular, el cuerpo y una imagen si quieres.</p>' +
+        '<p class="tiny muted" style="margin-bottom:1rem">Un titular, el cuerpo y las imágenes que quieras. Si es de un medio, ponle nombre.</p>' +
         '<form id="f-noticia" class="grid" style="gap:.8rem">' +
           '<div class="field"><label>Tu nombre</label><select id="n-nombre" required>' +
             U.opciones(C.MIEMBROS.map((x) => x.nombre), '', 'Elige tu nombre…') + '</select></div>' +
-          '<div class="field"><label>Tu código</label><input type="password" id="n-codigo" placeholder="AVE-····" autocomplete="off" required></div>' +
+          '<div class="field"><label>Nombre del diario o medio</label>' +
+            '<input type="text" id="n-diario" maxlength="60" placeholder="El Diario del Valor, Radio Stake…">' +
+            '<div class="hint">Opcional. Sale como cabecera de la noticia.</div></div>' +
           '<div class="field"><label>Titular</label><input type="text" id="n-titulo" maxlength="110" placeholder="El Partido del Valor promete bajar el stake" required></div>' +
           '<div class="field"><label>Cuerpo</label><textarea id="n-cuerpo" maxlength="1200" placeholder="Desarrolla la noticia…"></textarea></div>' +
-          '<div class="field"><label>Imagen</label><input type="file" id="n-img" accept="image/*"></div>' +
+          '<div class="field"><label>Imágenes</label><input type="file" id="n-img" accept="image/*" multiple>' +
+            '<div class="hint">Hasta 8. Si pones varias, se pasan en carrusel.</div></div>' +
           '<div id="n-aviso"></div>' +
           '<button class="btn btn-primary btn-block" type="submit">Publicar noticia</button>' +
         '</form></div>' +
@@ -1300,7 +1474,6 @@
         '<form id="f-galeria" class="grid" style="gap:.8rem">' +
           '<div class="field"><label>Tu nombre</label><select id="g-nombre" required>' +
             U.opciones(C.MIEMBROS.map((x) => x.nombre), '', 'Elige tu nombre…') + '</select></div>' +
-          '<div class="field"><label>Tu código</label><input type="password" id="g-codigo" placeholder="AVE-····" autocomplete="off" required></div>' +
           '<div class="field"><label>Pie de foto</label><input type="text" id="g-titulo" maxlength="80" placeholder="Opcional"></div>' +
           '<div class="field"><label>Imagen</label><input type="file" id="g-img" accept="image/*" required></div>' +
           '<div id="g-aviso"></div>' +
@@ -1312,19 +1485,32 @@
     $('#f-noticia').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector('button');
-      const v = await U.validarMiembro($('#n-nombre').value, $('#n-codigo').value);
+      const v = U.comprobarNombre($('#n-nombre').value);
       if (!v.ok) { $('#n-aviso').innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>'; return; }
       btn.disabled = true; btn.textContent = 'Publicando…';
       try {
         const mio = S.d.candidatos.find((c) => c.nombre === v.miembro.nombre);
-        const img = $('#n-img').files[0];
-        const imagen_url = img ? await DB.subir('noticias', img) : null;
-        await DB.crear('noticias', {
+        const archivos = Array.from($('#n-img').files || []).slice(0, 8);
+        const imagenes = [];
+        for (let i = 0; i < archivos.length; i++) {
+          btn.textContent = 'Subiendo imágenes (' + (i + 1) + '/' + archivos.length + ')…';
+          imagenes.push(await DB.subir('noticias', archivos[i]));
+        }
+        btn.textContent = 'Publicando…';
+        const creada = await DB.crear('noticias', {
           autor: v.miembro.nombre, candidato_id: mio ? mio.id : null,
-          titulo: $('#n-titulo').value.trim(), cuerpo: $('#n-cuerpo').value.trim(), imagen_url
+          titulo: $('#n-titulo').value.trim(), cuerpo: $('#n-cuerpo').value.trim(),
+          diario: $('#n-diario').value.trim() || null,
+          imagen_url: imagenes[0] || null, imagenes
         });
+        propio(creada && creada.id);
         await recargar();
-        U.toast('Noticia publicada.', 'ok');
+        if (DB.faltan.diario || DB.faltan.imagenes) {
+          U.toast('Publicada, pero sin ' + (DB.faltan.diario ? 'el nombre del diario' : 'todas las imágenes') +
+            ': falta ejecutar la migración 3 en Supabase.', 'err');
+        } else {
+          U.toast('Noticia publicada.', 'ok');
+        }
         vMuro();
       } catch (err) {
         $('#n-aviso').innerHTML = '<div class="alert alert-err"><div>' + U.esc(err.message) + '</div></div>';
@@ -1335,7 +1521,7 @@
     $('#f-galeria').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector('button');
-      const v = await U.validarMiembro($('#g-nombre').value, $('#g-codigo').value);
+      const v = U.comprobarNombre($('#g-nombre').value);
       if (!v.ok) { $('#g-aviso').innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>'; return; }
       const img = $('#g-img').files[0];
       if (!img) { $('#g-aviso').innerHTML = '<div class="alert alert-err"><div>Elige una imagen.</div></div>'; return; }
@@ -1343,10 +1529,11 @@
       try {
         const mio = S.d.candidatos.find((c) => c.nombre === v.miembro.nombre);
         const url = await DB.subir('galeria', img);
-        await DB.crear('galeria', {
+        const g = await DB.crear('galeria', {
           autor: v.miembro.nombre, candidato_id: mio ? mio.id : null,
           titulo: $('#g-titulo').value.trim() || null, url
         });
+        propio(g && g.id);
         await recargar();
         U.toast('Imagen subida al muro.', 'ok');
         vMuro();
@@ -1365,7 +1552,7 @@
     pinta('<div class="wrap section">' +
       '<div class="section-head"><div class="eyebrow">Preguntas y respuestas</div>' +
       '<h2 class="display">Pregunta a los candidatos</h2>' +
-      '<p class="lead">Cualquiera puede preguntar. Solo los candidatos pueden responder, con su código.</p></div>' +
+      '<p class="lead">Cualquiera puede preguntar. Solo los candidatos pueden responder.</p></div>' +
 
       '<div class="grid" style="grid-template-columns:1.3fr .7fr;gap:1.4rem" id="qa-grid">' +
         '<div id="qa-lista"></div>' +
@@ -1450,14 +1637,13 @@
       zona.innerHTML = '<div class="grid" style="gap:.7rem">' +
         '<div class="field"><label>Tu nombre (candidato)</label><select class="r-nombre" required>' +
           U.opciones(S.d.candidatos.map((c) => c.nombre), '', 'Elige…') + '</select></div>' +
-        '<div class="field"><label>Tu código</label><input type="password" class="r-codigo" placeholder="AVE-····" autocomplete="off"></div>' +
         '<div class="field"><textarea class="r-texto" maxlength="900" placeholder="Tu respuesta…" style="min-height:80px"></textarea></div>' +
         '<div class="r-aviso"></div>' +
         '<button class="btn btn-primary btn-sm r-enviar">Publicar respuesta</button></div>';
 
       $('.r-enviar', zona).addEventListener('click', async () => {
         const nombre = $('.r-nombre', zona).value;
-        const v = await U.validarMiembro(nombre, $('.r-codigo', zona).value);
+        const v = U.comprobarNombre(nombre);
         const aviso = $('.r-aviso', zona);
         if (!v.ok) { aviso.innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>'; return; }
         const c = S.d.candidatos.find((x) => x.nombre === nombre);

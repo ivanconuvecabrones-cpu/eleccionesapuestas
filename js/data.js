@@ -97,6 +97,7 @@
   const DB = {
     live: LIVE,
     modo: LIVE ? 'supabase' : 'demo',
+    faltan: {},     /* columnas que aún no existen en la base (migración pendiente) */
 
     /* ---- lectura ---- */
     async listar(tabla, opciones) {
@@ -149,6 +150,7 @@
         if (!campo || !(campo in fila)) throw e;
         console.warn('La columna "' + campo + '" no existe todavía en la base de datos. ' +
           'Se guarda sin ella. Ejecuta supabase/migracion-2.sql para habilitarla.');
+        DB.faltan[campo] = true;
         delete fila[campo];
         return this.crear(tabla, fila);
       }
@@ -164,12 +166,26 @@
         demo.save(tabla, filas);
         return filas[i];
       }
-      const res = await rest(tabla + '?id=eq.' + encodeURIComponent(id), {
+      const parche = Object.assign({}, datos);
+      const enviar = (d) => rest(tabla + '?id=eq.' + encodeURIComponent(id), {
         method: 'PATCH',
         headers: cabeceras({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-        body: JSON.stringify(datos)
+        body: JSON.stringify(d)
       });
-      return Array.isArray(res) ? res[0] : res;
+      for (let intento = 0; intento < 6; intento++) {
+        try {
+          const res = await enviar(parche);
+          return Array.isArray(res) ? res[0] : res;
+        } catch (e) {
+          const falta = /Could not find the '([^']+)' column|column "([^"]+)" of relation/i.exec(e.message || '');
+          const campo = falta && (falta[1] || falta[2]);
+          if (!campo || !(campo in parche)) throw e;
+          console.warn('La columna "' + campo + '" no existe todavía. Se guarda sin ella.');
+          DB.faltan[campo] = true;
+          delete parche[campo];
+        }
+      }
+      throw new Error('No se pudo guardar el cambio.');
     },
 
     async borrar(tabla, id) {
@@ -187,14 +203,15 @@
     async subir(carpeta, file) {
       const esImagen = /^image\//.test(file.type);
       const esVideo = /^video\//.test(file.type);
-      const maxMb = esImagen ? 12 : (esVideo ? 45 : 25);
+      const maxMb = esImagen ? 12 : (esVideo ? 50 : 25);
       if (file.size > maxMb * 1024 * 1024) {
-        throw new Error('El archivo pesa más de ' + maxMb + ' MB. Grábalo más corto o en menos calidad.');
+        throw new Error('El archivo pesa ' + Math.round(file.size / 1048576) + ' MB y el máximo es ' + maxMb +
+          ' MB.' + (esVideo ? ' Grábalo en 720p o recórtalo un poco (con 3 minutos a 720p suele caber).' : ''));
       }
       if (esVideo) {
         const seg = await duracionVideo(file);
-        if (seg && seg > 95) {
-          throw new Error('El vídeo dura ' + Math.round(seg) + ' segundos. El máximo es 1 minuto y medio.');
+        if (seg && seg > 185) {
+          throw new Error('El vídeo dura ' + Math.round(seg / 60 * 10) / 10 + ' minutos. El máximo son 3.');
         }
       }
       const blob = esImagen

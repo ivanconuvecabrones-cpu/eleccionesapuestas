@@ -429,6 +429,14 @@
       .map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
+  /* Para casi todo basta con elegir tu nombre de la lista. El código
+     solo se pide para votar y para editar tu candidatura. */
+  function comprobarNombre(nombre) {
+    const m = C.MIEMBROS.find((x) => x.nombre === nombre);
+    if (!m) return { ok: false, error: 'Elige tu nombre de la lista del grupo.' };
+    return { ok: true, miembro: m };
+  }
+
   async function validarMiembro(nombre, codigo) {
     const m = C.MIEMBROS.find((x) => x.nombre === nombre);
     if (!m) return { ok: false, error: 'Ese nombre no está en la lista del grupo.' };
@@ -467,7 +475,7 @@
   window.UI = {
     esc, escUrl, nl2br, fechaCorta, fechaLarga, hace,
     fases, proximoHito, toast, modal, lightbox, avatar, emblema, pintarCountdown,
-    radar, hemiciclo, semana, barras, afinidad, validarMiembro, hashCodigo,
+    radar, hemiciclo, semana, barras, afinidad, validarMiembro, comprobarNombre, hashCodigo,
     colorCasa, chipCasa,
     COLORES, EMOJIS, opciones, vacio
   };

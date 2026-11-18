@@ -11,11 +11,17 @@
 <meta property="og:type" content="website">
 
 <link rel="icon" href="img/favicon.png" type="image/png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AveFénix">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta property="og:image" content="img/logo-256.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=8">
+<link rel="stylesheet" href="css/styles.css?v=10">
 </head>
 <body>
 
@@ -30,6 +36,7 @@
         <div class="brand-sub">Elecciones 2026</div>
       </div>
     </div>
+    <button class="nav-bell" id="campana" aria-label="Novedades y avisos">🔔<span class="nav-bell-n" id="campana-n" hidden>0</span></button>
     <button class="nav-burger" id="burger" aria-label="Menú">☰</button>
     <div class="nav-links" id="nav-links"></div>
   </div>
@@ -47,6 +54,7 @@
     </div>
     <div class="row tiny">
       <span class="muted" id="pie-estado"></span>
+      <a class="nav-link" data-avisos>🔔 Avisos e instalar app</a>
       <a class="nav-link" data-ruta="/admin">Panel de admin</a>
     </div>
   </div>
@@ -57,9 +65,10 @@
 
 <!-- Si cambias algo del código, sube el número de ?v= para que a nadie
      le quede la versión vieja guardada en el navegador. -->
-<script src="js/config.js?v=8"></script>
-<script src="js/data.js?v=8"></script>
-<script src="js/ui.js?v=8"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/config.js?v=10"></script>
+<script src="js/data.js?v=10"></script>
+<script src="js/ui.js?v=10"></script>
+<script src="js/avisos.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>
