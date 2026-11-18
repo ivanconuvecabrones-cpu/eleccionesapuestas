@@ -93,10 +93,42 @@
     }
   }
 
+  /* ---------- versión nueva de la web ----------
+     Quien tiene la web abierta (o instalada) no se entera de los cambios
+     hasta que recarga. Aquí se compara el número de versión que está
+     corriendo con el del index.html publicado y se ofrece actualizar. */
+  const versionActual = () => {
+    const s = document.querySelector('script[src*="js/app.js"]');
+    const m = s && /[?&]v=(\d+)/.exec(s.getAttribute('src') || '');
+    return m ? m[1] : null;
+  };
+
+  function ofrecerActualizar() {
+    if (document.getElementById('banner-version')) return;
+    const d = document.createElement('div');
+    d.id = 'banner-version';
+    d.className = 'banner-version';
+    d.innerHTML = '<span>✨ Hay una versión nueva de la web.</span>' +
+      '<button class="btn btn-sm btn-primary" type="button">Actualizar</button>';
+    d.querySelector('button').addEventListener('click', () => { location.reload(); });
+    document.body.appendChild(d);
+  }
+
+  async function mirarVersion() {
+    const mia = versionActual();
+    if (!mia) return;
+    try {
+      const r = await fetch('index.html?_=' + Date.now(), { cache: 'no-store' });
+      const m = /js\/app\.js\?v=(\d+)/.exec(await r.text());
+      if (m && m[1] !== mia) ofrecerActualizar();
+    } catch (e) { /* sin conexión: ya se mirará */ }
+  }
+
   /* ---------- sondeo ---------- */
   async function sondear() {
     if (enCurso || navigator.onLine === false) return;
     enCurso = true;
+    mirarVersion();
     try {
       const todos = [];
       const nuevas = [];

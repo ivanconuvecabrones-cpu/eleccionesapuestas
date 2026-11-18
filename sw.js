@@ -5,7 +5,7 @@
    - Pinta los avisos y abre la web al tocarlos.
    ============================================================ */
 
-const CACHE = 'avefenix-v1';
+const CACHE = 'avefenix-v2';
 const BASICOS = ['./', 'index.html', 'img/logo-96.png', 'img/icon-192.png'];
 
 self.addEventListener('install', (e) => {
@@ -32,7 +32,7 @@ self.addEventListener('fetch', (e) => {
   if (u.origin !== self.location.origin) return;     // Supabase y fuentes van directos
 
   e.respondWith(
-    fetch(r)
+    fetch(r, { cache: 'no-cache' })
       .then((res) => {
         if (res && res.status === 200) {
           const copia = res.clone();

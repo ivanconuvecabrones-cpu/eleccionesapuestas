@@ -733,3 +733,13 @@ label.check input{width:auto;accent-color:var(--fire)}
 @media (min-width:1101px){
   .nav-link{padding:.5rem .65rem}
 }
+
+
+/* ---------- aviso de versión nueva ---------- */
+.banner-version{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:1rem;z-index:150;
+  display:flex;align-items:center;gap:.8rem;width:max-content;max-width:calc(100vw - 1.6rem);
+  background:rgba(26,26,28,.98);border:1px solid rgba(255,107,26,.55);border-radius:14px;
+  padding:.55rem .6rem .55rem 1rem;font-size:.88rem;font-weight:650;box-shadow:var(--shadow);
+  animation:toastIn .3s cubic-bezier(.2,.9,.2,1);
+}

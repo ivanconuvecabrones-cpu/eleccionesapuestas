@@ -389,13 +389,10 @@
       '<p class="tiny muted" style="margin-top:.35rem">' + d + '</p></div>';
 
   /* ============ CARTEL DE CANDIDATO ============ */
-  /* Letra en vez de número: un 1 y un 2 parecen un ranking, y no lo son. */
-  const letraCartel = (i) => String.fromCharCode(65 + (i % 26));
 
   function cartel(c, i) {
     const col = U.esc(c.color || '#ff6b1a');
     return '<div class="poster reveal d' + ((i % 6) + 1) + '" data-ruta="/candidato/' + U.esc(c.id) + '">' +
-      '<div class="poster-num">' + letraCartel(i) + '</div>' +
       (c.emblema_url ? '<img class="poster-emblema" src="' + U.escUrl(c.emblema_url) +
         '" alt="Emblema" loading="lazy">' : '') +
       '<div class="poster-photo' + (c.foto_url ? '' : ' ph') + '">' +
