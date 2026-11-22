@@ -2228,10 +2228,38 @@
   function vDirecto() {
     const ensayo = S.param === 'ensayo';
     if (!ensayo && !S.f.resultados) {
-      pinta('<div class="wrap section"><div class="alert alert-warn"><div><b>Todavía no se puede</b>El modo directo se abre cuando se cierran las urnas (' +
-        horaCierre() + '). Mientras tanto puedes probarlo con votos de mentira.</div></div>' +
-        '<div class="row" style="margin-top:1rem"><a class="btn btn-primary" data-ruta="/directo/ensayo">🎬 Hacer un ensayo</a>' +
-        '<a class="btn" data-ruta="/resultados">Volver</a></div></div>');
+      if (S.f.voto !== 'abierta' && Date.now() < new Date(C.FECHAS.apertura_voto).getTime()) {
+        pinta('<div class="wrap section"><div class="alert alert-warn"><div><b>Todavía no se puede</b>Aún no se han abierto las urnas.</div></div></div>');
+        return;
+      }
+      /* Pantalla de espera: al llegar a cero se abre sola y empieza la presentación */
+      document.body.classList.add('en-directo');
+      const esp = document.createElement('div');
+      esp.id = 'directo';
+      esp.innerHTML = '<div class="dir-fondo"></div><div class="dir-escena"><div class="dir-centro">' +
+        '<img class="dir-logo" src="img/logo.png" alt=""><div class="dir-eyebrow">Las urnas se cierran en</div>' +
+        '<div class="countdown dir-cd" id="dir-cd"></div>' +
+        '<div class="dir-sub" style="margin-top:1rem">' + S.d.votos.length + ' de ' + C.ESCANOS + ' ya han votado · el recuento empieza solo a las ' + horaCierre() + '</div>' +
+        '<div class="dir-sub" style="font-size:.95rem;opacity:.7">Esc para salir</div></div></div>';
+      document.body.appendChild(esp);
+      pinta('<div class="wrap section"><div class="spinner"></div></div>');
+      U.pintarCountdown($('#dir-cd'), C.FECHAS.cierre_voto);
+      let vivo = true;
+      const salirEspera = () => {
+        vivo = false; clearTimeout(t); document.removeEventListener('keydown', tecla);
+        esp.remove(); document.body.classList.remove('en-directo');
+        window.__quitarDirecto = null;
+      };
+      const tecla = (e) => { if (e.key === 'Escape') { salirEspera(); ir('/resultados'); } };
+      document.addEventListener('keydown', tecla);
+      window.__quitarDirecto = salirEspera;
+      const falta = new Date(C.FECHAS.cierre_voto).getTime() - Date.now();
+      const t = setTimeout(async () => {
+        if (!vivo) return;
+        try { await recargar(); } catch (e) { /* seguimos */ }
+        salirEspera();
+        if (S.f.resultados || Date.now() >= new Date(C.FECHAS.cierre_voto).getTime()) presentar(false);
+      }, Math.max(0, falta) + 1500);
       return;
     }
     if (!S.d.candidatos.length) { pinta('<div class="wrap section">' + U.vacio('🗳️', 'No hay candidatos', '') + '</div>'); return; }
@@ -2279,6 +2307,25 @@
       '<div class="dir-barra"><div style="width:' + Math.round(total / T * 100) + '%"></div></div>' +
       '<div class="dir-sub" style="margin-top:1.6rem">Hay ' + C.MAYORIA + ' escaños para la mayoría absoluta</div>', hemi: 0 });
 
+    /* 4. ministros */
+    C.VOTO_MINISTROS.forEach((mi) => {
+      const cont = {};
+      votos.forEach((v) => { const n = v[mi.clave]; if (n) cont[n] = (cont[n] || 0) + 1; });
+      const lista = Object.keys(cont).map((n) => ({ n: n, v: cont[n] })).sort((a, b) => b.v - a.v || a.n.localeCompare(b.n));
+      if (!lista.length) return;
+      pasos.push({ h: '<div class="dir-teaser">' + mi.icono + ' ' + U.esc(mi.nombre) + '…</div>' + puntos });
+      const max = lista[0].v;
+      pasos.push({ h: '<div class="dir-eyebrow">' + mi.icono + ' ' + U.esc(mi.nombre) + '</div>' +
+        '<div class="dir-nombre grande">' + (lista.filter((x) => x.v === max).length > 3
+          ? 'Empate a ' + max + ' entre ' + lista.filter((x) => x.v === max).length
+          : lista.filter((x) => x.v === max).map((x) => U.esc(x.n)).join(' y ')) + '</div>' +
+        '<div class="dir-sub">' + max + ' voto' + (max === 1 ? '' : 's') + '</div>' +
+        '<div class="dir-lista">' + lista.slice(0, 5).map((x) => '<div class="' + (x.v === max ? 'top' : '') + '"><span>' + U.esc(x.n) +
+          '</span><span>' + x.v + '</span></div>').join('') + '</div>' });
+    });
+
+    pasos.push({ h: '<div class="dir-eyebrow">Y ahora…</div><div class="dir-teaser final">La presidencia</div>' + puntos });
+
     /* 2. del último al primero */
     orden.forEach((p, i) => {
       const puesto = orden.length - i;
@@ -2301,23 +2348,6 @@
         ' Toca negociar.</div>', hemi: orden.length });
       pasos.push({ h: '<div class="dir-eyebrow">Mesa de negociación</div><div class="dir-pactos">' + pactos(rep) + '</div>' });
     }
-
-    /* 4. ministros */
-    C.VOTO_MINISTROS.forEach((mi) => {
-      const cont = {};
-      votos.forEach((v) => { const n = v[mi.clave]; if (n) cont[n] = (cont[n] || 0) + 1; });
-      const lista = Object.keys(cont).map((n) => ({ n: n, v: cont[n] })).sort((a, b) => b.v - a.v || a.n.localeCompare(b.n));
-      if (!lista.length) return;
-      pasos.push({ h: '<div class="dir-teaser">' + mi.icono + ' ' + U.esc(mi.nombre) + '…</div>' + puntos });
-      const max = lista[0].v;
-      pasos.push({ h: '<div class="dir-eyebrow">' + mi.icono + ' ' + U.esc(mi.nombre) + '</div>' +
-        '<div class="dir-nombre grande">' + (lista.filter((x) => x.v === max).length > 3
-          ? 'Empate a ' + max + ' entre ' + lista.filter((x) => x.v === max).length
-          : lista.filter((x) => x.v === max).map((x) => U.esc(x.n)).join(' y ')) + '</div>' +
-        '<div class="dir-sub">' + max + ' voto' + (max === 1 ? '' : 's') + '</div>' +
-        '<div class="dir-lista">' + lista.slice(0, 5).map((x) => '<div class="' + (x.v === max ? 'top' : '') + '"><span>' + U.esc(x.n) +
-          '</span><span>' + x.v + '</span></div>').join('') + '</div>' });
-    });
 
     /* 5. quién votó a quién, del último al primero */
     orden.forEach((p) => {
