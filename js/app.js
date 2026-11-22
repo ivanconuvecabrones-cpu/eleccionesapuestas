@@ -23,14 +23,13 @@
 
   const MENU = [
     { r: '/', t: 'Inicio' },
+    { r: '/votar', t: '🗳️ Votar' },
     { r: '/candidatos', t: 'Candidatos' },
     { r: '/comparar', t: 'Comparar' },
     { r: '/test', t: 'Test' },
-    { r: '/sondeo', t: 'Sondeo' },
     { r: '/debate', t: 'Debate' },
     { r: '/muro', t: 'Muro' },
     { r: '/preguntas', t: 'Preguntas' },
-    { r: '/votar', t: 'Votar' },
     { r: '/resultados', t: 'Resultados' }
   ];
 
@@ -115,7 +114,8 @@
   function pintarNav() {
     $('#nav-links').innerHTML = MENU.map((m) =>
       '<a class="nav-link" data-ruta="' + m.r + '">' + m.t + '</a>').join('') +
-      '<a class="btn btn-primary btn-sm" data-ruta="/presentar" style="margin-left:.4rem">Presentar candidatura</a>';
+      (U.fases(S.d ? S.d.ajustes : {}).candidatos === 'abierta'
+        ? '<a class="btn btn-primary btn-sm" data-ruta="/presentar" style="margin-left:.4rem">Presentar candidatura</a>' : '');
     $('#burger').addEventListener('click', () => $('#nav-links').classList.toggle('open'));
   }
 
@@ -161,6 +161,7 @@
   function vInicio() {
     const cs = S.d.candidatos;
     const hito = U.proximoHito(S.f);
+    vigilarCierre();
     const noticias = S.d.noticias.slice(0, 4);
     const fotos = S.d.galeria.slice(0, 12);
 
@@ -170,17 +171,22 @@
         '<div class="hero-grid">' +
           '<div class="reveal">' +
             '<div class="eyebrow">Elecciones a la presidencia · 2026</div>' +
-            '<h1 class="display">Ave<span class="grad-text">Fénix</span><br>elige presidente</h1>' +
-            '<p class="lead">Se vota de verdad. ' + C.MIEMBROS.length + ' miembros, ' + C.ESCANOS +
-              ' escaños y mayoría absoluta en ' + C.MAYORIA + '. ' +
-              'El que gane marca las normas del grupo: stakes, deportes, tono y a quién se echa.</p>' +
+            '<h1 class="display">' + (S.f.resultados
+              ? 'Ave<span class="grad-text">Fénix</span><br>ya tiene presidente'
+              : (S.f.voto === 'abierta' ? 'Hoy <span class="grad-text">se vota</span>' : 'Ave<span class="grad-text">Fénix</span><br>elige presidente')) + '</h1>' +
+            '<p class="lead">' + (S.f.resultados
+              ? 'Las urnas están cerradas y el recuento está hecho. Entra y mira cómo ha quedado.'
+              : (S.f.voto === 'abierta'
+                ? 'Las urnas se cierran hoy a las ' + horaCierre() + '. Voto secreto con tu código personal; ' + C.MIEMBROS.length +
+                  ' miembros, ' + C.ESCANOS + ' escaños y mayoría absoluta en ' + C.MAYORIA + '. A esa hora se abre la urna y se sabe quién ha votado a quién.'
+                : 'Se vota de verdad. ' + C.MIEMBROS.length + ' miembros, ' + C.ESCANOS + ' escaños y mayoría absoluta en ' + C.MAYORIA + '.')) + '</p>' +
             '<div class="row" style="margin-top:1.6rem">' +
-              (S.f.candidatos === 'abierta'
-                ? '<a class="btn btn-primary btn-lg" data-ruta="/presentar">🔥 Presentar mi candidatura</a>'
-                : '<a class="btn btn-lg" data-ruta="/candidatos">Ver candidatos</a>') +
-              (S.f.voto === 'abierta'
-                ? '<a class="btn btn-fire btn-lg" data-ruta="/votar">🗳️ Votar ahora</a>'
-                : '<a class="btn btn-lg btn-ghost" data-ruta="/test">¿Con quién encajo?</a>') +
+              (S.f.resultados
+                ? '<a class="btn btn-fire btn-lg" data-ruta="/resultados">🏆 Ver resultados</a>'
+                : (S.f.voto === 'abierta'
+                    ? '<a class="btn btn-fire btn-lg" data-ruta="/votar">🗳️ Votar ahora</a>'
+                    : '<a class="btn btn-lg" data-ruta="/candidatos">Ver candidatos</a>')) +
+              '<a class="btn btn-lg btn-ghost" data-ruta="/test">🧭 ¿Con quién encajo?</a>' +
             '</div>' +
           '</div>' +
           '<div class="reveal d2">' +
@@ -196,14 +202,16 @@
           '</div></div>' : '') +
       '</div>' +
 
-      /* ---------- la semana, en gráfico ---------- */
-      '<div class="wrap section" style="padding-top:1rem">' +
-        '<div class="section-head"><div class="eyebrow">Calendario</div>' +
-        '<h2 class="display">Cómo va esto</h2>' +
-        '<p class="lead tiny">Del ' + U.fechaLarga(C.FECHAS.inicio_campana) + ' al ' +
-          U.fechaLarga(C.FECHAS.cierre_voto) + '. Esto es lo que ocupa cada fase.</p></div>' +
-        '<div class="card">' + U.semana() + '</div>' +
-      '</div>' +
+      /* ---------- jornada electoral ---------- */
+      (S.f.voto === 'abierta' || S.f.resultados
+        ? '<div class="wrap section" style="padding-top:1rem">' +
+            '<div class="section-head"><div class="eyebrow">Jornada electoral</div>' +
+            '<h2 class="display">' + (S.f.resultados ? 'Participación final' : '¿Cuánta gente ha votado?') + '</h2></div>' +
+            progresoVoto(false) +
+            (S.f.voto === 'abierta' ? '<div class="row" style="justify-content:center;margin-top:1.2rem">' +
+              '<a class="btn btn-fire btn-lg" data-ruta="/votar">🗳️ Ir a votar</a></div>' : '') +
+          '</div>'
+        : '') +
 
       /* ---------- candidatos ---------- */
       '<div class="wrap section" style="padding-top:0">' +
@@ -264,7 +272,6 @@
         '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">' +
           atajo('🧭', 'Test de afinidad', 'Responde ' + C.TEST.length + ' preguntas y te dice qué candidato encaja contigo.', '/test') +
           atajo('⚖️', 'Comparador', 'Pon dos o más candidatos cara a cara, métrica por métrica.', '/comparar') +
-          atajo('📊', 'Sondeo', 'Intención de voto no vinculante. Para ir metiendo presión.', '/sondeo') +
           atajo('🎤', 'Debate', 'Temas del cara a cara y preguntas que puedes mandar.', '/debate') +
           atajo('📰', 'Muro', 'Noticias de campaña, carteles y memes.', '/muro') +
           atajo('❓', 'Preguntas', 'Pregunta a los candidatos y mira qué contestan.', '/preguntas') +
@@ -1922,8 +1929,46 @@
   }
 
   /* ============================================================
-     VISTA · VOTAR
+     VISTA · VOTAR (voto secreto: solo se ve cuánta gente ha votado)
      ============================================================ */
+  const horaCierre = () => new Date(C.FECHAS.cierre_voto)
+    .toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+  /* A la hora del cierre, la web se pone al día sola aunque esté abierta */
+  let relojCierre = null;
+  function vigilarCierre() {
+    clearTimeout(relojCierre);
+    const falta = new Date(C.FECHAS.cierre_voto).getTime() - Date.now();
+    if (falta > 0 && falta < 2147000000) {
+      relojCierre = setTimeout(() => { recargar().then(enrutar).catch(enrutar); }, falta + 1500);
+    }
+  }
+
+  /* El voto se identifica solo con el código; no hace falta decir quién eres */
+  async function miembroPorCodigo(codigo) {
+    const h = await U.hashCodigo(codigo);
+    return C.MIEMBROS.find((m) => String(m.hash || '').toLowerCase() === h) || null;
+  }
+
+  /* Participación: cuántos han votado y cuántos faltan, nunca quién */
+  function progresoVoto(compacto) {
+    const n = S.d.votos.length, T = C.ESCANOS;
+    const pct = Math.min(100, Math.round((n / T) * 100));
+    return '<div class="card progreso-voto">' +
+      '<div class="spread"><div><div class="eyebrow">Participación</div>' +
+        '<div class="display" style="font-size:2.4rem;margin-top:.2rem">' + n +
+        ' <span class="muted" style="font-size:1.2rem">de ' + T + '</span></div></div>' +
+        '<div style="text-align:right"><div style="font-weight:800;font-size:1.5rem;color:var(--amber)">' + pct + '%</div>' +
+        '<div class="tiny muted">faltan ' + Math.max(0, T - n) + ' por votar</div></div></div>' +
+      '<div class="bar" style="height:12px;margin:.9rem 0 .3rem"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+      (compacto ? '' :
+        '<div style="max-width:480px;margin:.6rem auto 0">' +
+          U.hemiciclo([{ nombre: 'Han votado', candidato: 'Voto emitido', color: '#ffb020', escanos: n }], T) + '</div>' +
+        '<p class="tiny muted" style="text-align:center">Cada escaño dorado es un voto ya emitido; los vacíos están pendientes. ' +
+          'Quién ha votado a quién se sabe a las ' + horaCierre() + '.</p>') +
+    '</div>';
+  }
+
   function vVotar() {
     const cs = S.d.candidatos;
     const F = C.FECHAS;
@@ -1934,41 +1979,32 @@
         '<div class="section-head"><div class="eyebrow">Votación</div>' +
         '<h2 class="display">' + (antes ? 'Las urnas aún no están abiertas' : 'Las urnas están cerradas') + '</h2></div>' +
         (antes
-          ? '<div class="card"><div class="spread"><div>' +
-            '<div class="eyebrow">Se abren el ' + U.fechaLarga(F.apertura_voto) + '</div>' +
-            '<p class="tiny muted" style="margin-top:.4rem">Hasta entonces puedes opinar en el sondeo, hacer el test y leer los programas.</p></div>' +
-            '<div class="countdown" id="cd-voto"></div></div></div>' +
-            '<div class="row" style="margin-top:1.4rem">' +
-            '<a class="btn btn-primary" data-ruta="/sondeo">📊 Ir al sondeo</a>' +
-            '<a class="btn" data-ruta="/test">🧭 Hacer el test</a></div>'
-          : '<div class="alert alert-ok"><div><b>Votación terminada</b>' +
-            'Se cerró el ' + U.fechaLarga(F.cierre_voto) + '. Ya puedes ver el resultado.</div></div>' +
+          ? '<div class="card"><div class="spread"><div><div class="eyebrow">Se abren el ' + U.fechaLarga(F.apertura_voto) + '</div></div>' +
+            '<div class="countdown" id="cd-voto"></div></div></div>'
+          : '<div class="alert alert-ok"><div><b>Votación terminada</b>Ya se puede ver el resultado.</div></div>' +
             '<div class="row" style="margin-top:1.4rem"><a class="btn btn-fire btn-lg" data-ruta="/resultados">🏆 Ver resultados</a></div>') +
       '</div>');
       if ($('#cd-voto')) U.pintarCountdown($('#cd-voto'), F.apertura_voto);
       return;
     }
 
-    if (!cs.length) {
-      pinta('<div class="wrap section">' + U.vacio('🗳️', 'No hay candidatos', 'No se puede votar sin candidatos.') + '</div>');
-      return;
-    }
+    if (!cs.length) { pinta('<div class="wrap section">' + U.vacio('🗳️', 'No hay candidatos', '') + '</div>'); return; }
+    vigilarCierre();
 
     pinta('<div class="wrap section">' +
-      '<div class="section-head"><div class="eyebrow"><span class="dot dot-live"></span> Urnas abiertas · hasta el ' +
-        U.fechaLarga(F.cierre_voto) + '</div>' +
+      '<div class="section-head"><div class="eyebrow"><span class="dot dot-live"></span> Urnas abiertas · cierran hoy a las ' + horaCierre() + '</div>' +
       '<h2 class="display">Vota a tu presidente</h2>' +
-      '<p class="lead">Un voto por persona y no se puede cambiar. ' + S.d.votos.length + ' de ' + C.ESCANOS +
-      ' miembros han votado ya.</p></div>' +
+      '<p class="lead">Voto <b>secreto</b> y definitivo. Solo necesitas tu código personal. ' +
+        'A las ' + horaCierre() + ' se abre la urna y se sabe quién ha votado a quién.</p></div>' +
+      '<div class="card" style="margin-bottom:1.2rem"><div class="spread"><div class="eyebrow">Se cierran las urnas en</div>' +
+        '<div class="countdown" id="cd-voto"></div></div></div>' +
 
-      '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.4rem">' +
+      '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.4rem;align-items:start">' +
         '<div class="card">' +
           '<h3 style="margin-bottom:1rem">🗳️ Tu papeleta</h3>' +
           '<form id="f-voto" class="grid" style="gap:1rem">' +
-            '<div class="field"><label>Tu nombre <span class="req">*</span></label>' +
-              '<select id="v-nombre" required>' + U.opciones(C.MIEMBROS.map((x) => x.nombre), '', 'Elige tu nombre…') + '</select></div>' +
-            '<div class="field"><label>Tu código <span class="req">*</span></label>' +
-              '<input type="password" id="v-codigo" placeholder="AVE-····" autocomplete="off" required></div>' +
+            '<div class="field"><label>Tu código personal <span class="req">*</span></label>' +
+              '<input type="password" id="v-codigo" placeholder="AVE-········" autocomplete="off" required></div>' +
             '<div class="field"><label>Tu voto <span class="req">*</span></label>' +
               '<div class="radio-list" id="v-lista">' + cs.map((c) =>
                 '<div class="radio-opt" data-id="' + U.esc(c.id) + '"><div class="radio-mark"></div>' +
@@ -1979,22 +2015,13 @@
               '</div></div>' +
             '<div id="v-aviso"></div>' +
             '<button class="btn btn-fire btn-lg btn-block" type="submit">🗳️ Emitir mi voto</button>' +
-            '<p class="tiny muted" style="text-align:center">Al votar confirmas que eres tú. No hay vuelta atrás.</p>' +
+            '<p class="tiny muted" style="text-align:center">No se puede cambiar. Nadie ve a quién votas hasta el recuento.</p>' +
           '</form>' +
         '</div>' +
-
-        '<div class="card">' +
-          '<h3 style="margin-bottom:.9rem">📋 Quién ha votado ya</h3>' +
-          '<div class="grid" style="gap:.45rem">' + C.MIEMBROS.map((m) => {
-            const yavoto = S.d.votos.some((v) => v.votante === m.nombre);
-            return '<div class="row" style="justify-content:space-between;padding:.5rem .7rem;background:var(--panel);border-radius:10px;border:1px solid var(--line)">' +
-              '<span style="font-size:.9rem;font-weight:650">' + U.esc(m.nombre) + '</span>' +
-              (yavoto ? '<span class="chip chip-ok">✓ Votado</span>' : '<span class="chip chip-off">Pendiente</span>') + '</div>';
-          }).join('') + '</div>' +
-          '<div class="alert alert-info" style="margin-top:1.1rem"><div><b>Secreto del voto</b>' +
-            'Aquí se ve <b>quién ha votado</b>, pero no a quién. El reparto se publica al cerrar las urnas.</div></div>' +
-        '</div>' +
+        progresoVoto(false) +
       '</div></div>');
+
+    U.pintarCountdown($('#cd-voto'), F.cierre_voto);
 
     let elegido = null;
     $$('#v-lista .radio-opt').forEach((o) => o.addEventListener('click', () => {
@@ -2005,14 +2032,12 @@
     $('#f-voto').addEventListener('submit', async (e) => {
       e.preventDefault();
       const aviso = $('#v-aviso');
-      const nombre = $('#v-nombre').value;
-      const v = await U.validarMiembro(nombre, $('#v-codigo').value);
-      if (!v.ok) { aviso.innerHTML = '<div class="alert alert-err"><div>' + U.esc(v.error) + '</div></div>'; return; }
-      if (S.d.votos.some((x) => x.votante === nombre)) {
-        aviso.innerHTML = '<div class="alert alert-err"><div><b>Ya has votado</b>Cada miembro vota una sola vez.</div></div>';
-        return;
-      }
-      if (!elegido) { aviso.innerHTML = '<div class="alert alert-err"><div>Elige a un candidato.</div></div>'; return; }
+      const err = (t) => { aviso.innerHTML = '<div class="alert alert-err"><div>' + t + '</div></div>'; };
+      const m = await miembroPorCodigo($('#v-codigo').value);
+      if (!m) return err('Ese código no es válido. Revísalo o pídeselo a quien lleva el grupo.');
+      try { await recargar(); } catch (x) { /* seguimos con lo que hay */ }
+      if (S.d.votos.some((x) => x.votante === m.nombre)) return err('<b>Ese código ya ha votado</b>Cada miembro vota una sola vez.');
+      if (!elegido) return err('Elige a un candidato.');
       aviso.innerHTML = '';
 
       const c = cand(elegido);
@@ -2023,166 +2048,176 @@
           U.avatar(c, 'match-av') +
           '<div><div style="font-weight:800">' + U.esc(c.nombre) + '</div>' +
           '<div class="tiny" style="color:' + U.esc(c.color) + '">' + U.esc(c.partido || '') + '</div></div></div>' +
-        '<p class="tiny muted" style="margin:1rem 0 1.2rem">Votas como <b>' + U.esc(nombre) +
-          '</b>. Una vez emitido no se puede cambiar.</p>' +
-        '<div class="row"><button class="btn btn-fire btn-block" id="v-ok">Sí, este es mi voto</button></div>');
+        '<p class="tiny muted" style="margin:1rem 0 1.2rem">Una vez emitido no se puede cambiar. Nadie sabrá a quién has votado hasta el recuento.</p>' +
+        '<button class="btn btn-fire btn-block" id="v-ok">Sí, este es mi voto</button>');
 
       $('#v-ok').addEventListener('click', async () => {
         const btn = $('#v-ok');
         btn.disabled = true; btn.textContent = 'Registrando…';
         try {
-          await DB.crear('votos', { votante: nombre, candidato_id: elegido });
+          await DB.crear('votos', { votante: m.nombre, candidato_id: elegido });
           await recargar();
           cerrar();
-          U.modal('<div style="text-align:center">' +
-            '<div style="font-size:3.4rem">🗳️</div>' +
+          U.modal('<div style="text-align:center"><div style="font-size:3.4rem">🗳️</div>' +
             '<h3 class="display" style="font-size:2rem;margin:.5rem 0">Voto emitido</h3>' +
-            '<p class="muted">Gracias, ' + U.esc(nombre) + '. Tu voto ya está en la urna.</p>' +
-            '<p class="tiny muted" style="margin-top:.8rem">Han votado ' + S.d.votos.length + ' de ' + C.ESCANOS + '.</p>' +
-            '<button class="btn btn-primary btn-block" style="margin-top:1.2rem" onclick="location.hash=\'/resultados\'">Ver cómo va</button></div>');
-          U.toast('Voto registrado. Gracias.', 'ok');
-        } catch (err) {
+            '<p class="muted">Gracias, ' + U.esc(m.nombre.split(' ')[0]) + '. Tu voto está en la urna y es secreto.</p>' +
+            '<p class="tiny muted" style="margin-top:.8rem">Han votado ' + S.d.votos.length + ' de ' + C.ESCANOS +
+            '. El recuento es a las ' + horaCierre() + '.</p></div>');
+          vVotar();
+        } catch (er) {
           btn.disabled = false; btn.textContent = 'Sí, este es mi voto';
-          const dup = /duplicate|unique|23505/i.test(err.message || '');
-          U.toast(dup ? 'Ese nombre ya ha votado.' : (err.message || 'No se pudo registrar el voto.'), 'err');
+          U.toast(/duplicate|unique|23505|409/i.test(er.message || '') ? 'Ese código ya ha votado.' : (er.message || 'No se pudo registrar el voto.'), 'err');
         }
       });
     });
   }
 
   /* ============================================================
-     VISTA · RESULTADOS
+     VISTA · RESULTADOS (se abren a la hora del cierre)
      ============================================================ */
   function vResultados() {
     const total = S.d.votos.length;
-    const rep = reparto('votos');
-    const ganador = rep[0];
-    const hayMayoria = ganador && ganador.escanos >= C.MAYORIA;
-    const empate = rep.length > 1 && ganador && rep[1].escanos === ganador.escanos;
-
     if (!S.f.resultados) {
-      const repS = reparto('sondeo');
+      vigilarCierre();
       pinta('<div class="wrap section">' +
         '<div class="section-head"><div class="eyebrow">Resultados</div>' +
-        '<h2 class="display">Todavía no se pueden ver</h2>' +
-        '<p class="lead">El reparto de escaños se publica al cerrar las urnas, el ' +
-          U.fechaLarga(C.FECHAS.cierre_voto) + ' por la noche. Mientras tanto, solo se sabe cuánta gente ha votado.</p></div>' +
-
-        '<div class="card" style="margin-bottom:1.4rem"><div class="spread">' +
-          '<div><div class="eyebrow">Participación</div>' +
-            '<div class="display" style="font-size:2.8rem;margin-top:.3rem">' + total + ' / ' + C.ESCANOS + '</div>' +
-            '<div class="tiny muted">' + Math.round((total / C.ESCANOS) * 100) + '% del grupo ha votado</div></div>' +
-          (S.f.voto === 'abierta' ? '<div class="countdown" id="cd-res"></div>' : '') +
-        '</div>' +
-        '<div class="bar" style="margin-top:1rem"><div class="bar-fill" style="width:' +
-          Math.round((total / C.ESCANOS) * 100) + '%"></div></div></div>' +
-
-        (S.d.sondeo.length
-          ? '<div class="card"><h3 style="margin-bottom:.4rem">📊 Lo último que decía el sondeo</h3>' +
-            '<p class="tiny muted" style="margin-bottom:1rem">No es el resultado real, es solo la encuesta.</p>' +
-            U.hemiciclo(repS, C.ESCANOS) + '</div>' : '') +
-
+        '<h2 class="display">El recuento es a las ' + horaCierre() + '</h2>' +
+        '<p class="lead">Mientras tanto solo se sabe cuánta gente ha votado. Quién ha votado a quién se revela en directo al cerrar las urnas.</p></div>' +
+        (S.f.voto === 'abierta' ? '<div class="card" style="margin-bottom:1.2rem"><div class="spread"><div class="eyebrow">Faltan</div>' +
+          '<div class="countdown" id="cd-res"></div></div></div>' : '') +
+        progresoVoto(false) +
         '<div class="row" style="margin-top:1.4rem">' +
           (S.f.voto === 'abierta' ? '<a class="btn btn-fire" data-ruta="/votar">🗳️ Votar</a>' : '') +
-          '<a class="btn" data-ruta="/candidatos">Ver candidatos</a></div>' +
-      '</div>');
+          '<a class="btn" data-ruta="/candidatos">Ver candidatos</a></div></div>');
       if ($('#cd-res')) U.pintarCountdown($('#cd-res'), C.FECHAS.cierre_voto);
       return;
     }
+    if (!total) {
+      pinta('<div class="wrap section">' + U.vacio('🗳️', 'No se registró ningún voto', 'No hay nada que repartir.') + '</div>');
+      return;
+    }
+    ceremonia();
+  }
+
+  /* Revelación: del último puesto al primero, escaño a escaño */
+  function ceremonia() {
+    const total = S.d.votos.length, T = C.ESCANOS;
+    const rep = reparto('votos');                 // de más a menos
+    const orden = rep.slice().reverse();          // se enseñan del último al primero
+    let paso = 0, timer = null, empezado = false;
 
     pinta('<div class="wrap section">' +
       '<div class="section-head" style="align-items:center;text-align:center">' +
-        '<div class="eyebrow" style="justify-content:center">Resultado definitivo</div>' +
-        '<h2 class="display">' + (total ? 'Así ha quedado' : 'Nadie ha votado') + '</h2></div>' +
+        '<div class="eyebrow" style="justify-content:center">Recuento oficial</div>' +
+        '<h2 class="display">Se abre la urna</h2>' +
+        '<p class="lead tiny">' + total + ' votos de ' + T + ' posibles. Mayoría absoluta: ' + C.MAYORIA + ' escaños.</p></div>' +
+      '<div class="card" style="margin-bottom:1.2rem"><div class="hemi-wrap" id="cer-hemi"></div>' +
+        '<div class="hemi-leyenda" id="cer-ley"></div></div>' +
+      '<div id="cer-ctrl" class="row" style="justify-content:center;margin-bottom:1.2rem"></div>' +
+      '<div id="cer-lista" class="grid" style="gap:.9rem"></div>' +
+      '<div id="cer-final"></div></div>');
 
-      (total ? (
-        /* ganador */
-        '<div class="card reveal" style="margin-bottom:1.6rem;text-align:center;border-color:' +
-          U.esc(ganador.color) + '55">' +
+    const pintar = () => {
+      const vistos = orden.slice(0, paso).sort((a, b) => b.escanos - a.escanos);
+      const abiertos = vistos.reduce((s, p) => s + p.escanos, 0);
+      const hemi = vistos.map((p) => ({ nombre: p.nombre, candidato: p.candidato, color: p.color, escanos: p.escanos }));
+      if (total - abiertos > 0) hemi.push({ nombre: 'Sobres sin abrir', candidato: 'Sin abrir', color: '#55555a', escanos: total - abiertos });
+      $('#cer-hemi').innerHTML = U.hemiciclo(hemi, T);
+      $('#cer-ley').innerHTML = vistos.map((p) => '<span class="chip" style="border-color:' + U.esc(p.color) + '66">' +
+        '<span class="dot" style="background:' + U.esc(p.color) + '"></span>' + U.esc(p.siglas || p.candidato) + ' · ' + p.escanos + '</span>').join('');
+
+      /* tarjetas reveladas, la última abierta arriba */
+      $('#cer-lista').innerHTML = orden.slice(0, paso).map((p, i) => {
+        const puesto = orden.length - i;
+        const c = cand(p.id) || {};
+        const etiqueta = puesto === 1 ? '👑 Ganador' : (puesto === 2 ? '🥈 Segundo' : (puesto === 3 ? '🥉 Tercero' : puesto + 'º puesto'));
+        return '<div class="cer-card' + (puesto === 1 ? ' oro' : '') + '" style="--c:' + U.esc(p.color) + ';order:' + (-i) + '">' +
+          U.avatar(c, 'match-av') +
+          '<div style="flex:1;min-width:0"><div class="chip chip-fire" style="margin-bottom:.35rem">' + etiqueta + '</div>' +
+            '<div style="font-weight:850;font-size:1.15rem">' + U.esc(p.candidato) + '</div>' +
+            '<div class="tiny" style="color:' + U.esc(p.color) + '">' + U.esc(p.nombre) + '</div>' +
+            '<div class="res-bar" style="margin-top:.5rem"><div class="res-bar-fill" style="width:' +
+              Math.round((p.escanos / T) * 100) + '%;background:' + U.esc(p.color) + '"></div></div></div>' +
+          '<div style="text-align:center"><div class="display" style="font-size:2.6rem;color:' + U.esc(p.color) + '">' + p.escanos + '</div>' +
+            '<div class="tiny muted">escaños</div></div></div>';
+      }).join('');
+
+      const ctrl = $('#cer-ctrl');
+      if (paso >= orden.length) { ctrl.innerHTML = ''; clearInterval(timer); final(); return; }
+      ctrl.innerHTML = !empezado
+        ? '<button class="btn btn-fire btn-lg" id="cer-ir">▶ Empezar el recuento</button><button class="btn btn-ghost" id="cer-salta">Saltar al final</button>'
+        : '<button class="btn btn-ghost" id="cer-salta">Saltar al final</button>';
+      const ir = $('#cer-ir');
+      if (ir) ir.addEventListener('click', () => { empezado = true; avanzar(); timer = setInterval(avanzar, 4200); });
+      $('#cer-salta').addEventListener('click', () => { clearInterval(timer); paso = orden.length; pintar(); });
+    };
+
+    const avanzar = () => { if (!document.getElementById('cer-lista')) { clearInterval(timer); return; } paso++; pintar(); };
+
+    const final = () => {
+      const g = rep[0], hayMayoria = g.escanos >= C.MAYORIA;
+      const empate = rep.length > 1 && rep[1].escanos === g.escanos;
+      const cg = cand(g.id) || {};
+      const porCand = rep.map((p) => ({ p, votantes: S.d.votos.filter((v) => String(v.candidato_id) === String(p.id)).map((v) => v.votante).sort() }));
+
+      $('#cer-final').innerHTML =
+        '<div class="card reveal" style="margin-top:1.4rem;text-align:center;border-color:' + U.esc(g.color) + '66">' +
           (hayMayoria && !empate
-            ? '<div style="font-size:3rem">👑</div>' +
-              '<div class="eyebrow" style="justify-content:center">Presidente de AveFénix</div>' +
-              '<h2 class="display" style="font-size:clamp(2rem,6vw,3.4rem);margin:.4rem 0">' + U.esc(ganador.candidato) + '</h2>' +
-              '<p class="lead" style="margin-inline:auto">' + U.esc(ganador.nombre) + ' · ' +
-                ganador.escanos + ' de ' + C.ESCANOS + ' escaños. Mayoría absoluta.</p>'
-            : empate
-              ? '<div style="font-size:3rem">⚖️</div>' +
-                '<div class="eyebrow" style="justify-content:center">Empate técnico</div>' +
-                '<h2 class="display" style="font-size:clamp(1.6rem,5vw,2.6rem);margin:.4rem 0">Nadie se lleva el gato al agua</h2>' +
-                '<p class="lead" style="margin-inline:auto">' + rep.filter((p) => p.escanos === ganador.escanos)
-                  .map((p) => U.esc(p.candidato)).join(' y ') + ' empatan a ' + ganador.escanos +
-                  ' escaños. Toca segunda vuelta o pacto.</p>'
-              : '<div style="font-size:3rem">🤝</div>' +
-                '<div class="eyebrow" style="justify-content:center">Sin mayoría absoluta</div>' +
-                '<h2 class="display" style="font-size:clamp(1.8rem,5vw,3rem);margin:.4rem 0">' + U.esc(ganador.candidato) + ' gana, pero no manda solo</h2>' +
-                '<p class="lead" style="margin-inline:auto">' + ganador.escanos + ' escaños de ' + C.ESCANOS +
-                  '. Le faltan ' + (C.MAYORIA - ganador.escanos) + ' para la mayoría absoluta: hay que pactar.</p>') +
+            ? '<div style="font-size:3rem">👑</div><div class="eyebrow" style="justify-content:center">Presidente de AveFénix</div>' +
+              '<h2 class="display" style="font-size:clamp(2rem,6vw,3.4rem);margin:.4rem 0">' + U.esc(g.candidato) + '</h2>' +
+              '<p class="lead" style="margin-inline:auto">' + U.esc(g.nombre) + ' · ' + g.escanos + ' de ' + T + ' escaños. Mayoría absoluta.</p>'
+            : '<div style="font-size:3rem">🤝</div><div class="eyebrow" style="justify-content:center">' + (empate ? 'Empate' : 'Sin mayoría absoluta') + '</div>' +
+              '<h2 class="display" style="font-size:clamp(1.8rem,5vw,3rem);margin:.4rem 0">' +
+                (empate ? 'Hay que negociar' : U.esc(g.candidato) + ' gana, pero no manda solo') + '</h2>' +
+              '<p class="lead" style="margin-inline:auto">' + (empate
+                ? rep.filter((p) => p.escanos === g.escanos).map((p) => U.esc(p.candidato)).join(' y ') + ' empatan a ' + g.escanos + ' escaños.'
+                : g.escanos + ' escaños de ' + T + '. Le faltan ' + (C.MAYORIA - g.escanos) + ' para la mayoría absoluta (' + C.MAYORIA + ').') +
+                ' Toca pactar.</p>') +
         '</div>' +
+        (hayMayoria && !empate ? gabineteGanador(g.id) : pactos(rep)) +
 
-        /* hemiciclo */
-        '<div class="card reveal d2" style="margin-bottom:1.4rem">' +
-          '<h3 style="margin-bottom:.3rem;text-align:center">El hemiciclo</h3>' +
-          '<p class="tiny muted" style="text-align:center;margin-bottom:.5rem">Cada asiento es un miembro del grupo.</p>' +
-          '<div class="hemi-wrap">' + U.hemiciclo(rep, C.ESCANOS) + '</div>' +
-          '<div class="row" style="justify-content:center;margin-top:.6rem">' + rep.filter((p) => p.escanos)
-            .map((p) => '<span class="chip" style="border-color:' + U.esc(p.color) + '66">' +
-              '<span class="dot" style="background:' + U.esc(p.color) + '"></span>' +
-              U.esc(p.siglas || p.nombre) + ' · ' + p.escanos + '</span>').join('') + '</div>' +
-        '</div>' +
+        '<div class="card reveal" style="margin-top:1.4rem"><h3 style="margin-bottom:.3rem">🗳️ Quién ha votado a quién</h3>' +
+          '<p class="tiny muted" style="margin-bottom:1rem">Ahora que las urnas están cerradas, el voto deja de ser secreto.</p>' +
+          porCand.map((x) => '<div style="padding:.8rem 0;border-top:1px solid var(--line)">' +
+            '<div class="row" style="gap:.6rem;margin-bottom:.5rem">' + U.avatar(cand(x.p.id) || {}, 'cmp-av') +
+              '<b>' + U.esc(x.p.candidato) + '</b><span class="chip" style="border-color:' + U.esc(x.p.color) + '66">' + x.votantes.length + '</span></div>' +
+            (x.votantes.length ? '<div class="row" style="gap:.4rem">' + x.votantes.map((n) => '<span class="chip">' + U.esc(n) + '</span>').join('') + '</div>'
+              : '<span class="tiny muted">Nadie le ha votado.</span>') + '</div>').join('') +
+          (total < T ? '<p class="tiny muted" style="margin-top:.8rem">No votaron ' + (T - total) + ' de ' + T + ' miembros.</p>' : '') +
+        '</div>';
+    };
 
-        /* tabla de reparto */
-        '<div class="card reveal d3" style="margin-bottom:1.4rem">' +
-          '<h3 style="margin-bottom:1rem">Reparto de escaños</h3>' +
-          '<div class="results-list">' + rep.map((p, i) =>
-            '<div class="res-row' + (i === 0 && hayMayoria && !empate ? ' winner' : '') + '" data-ruta="/candidato/' + U.esc(p.id) + '" style="cursor:pointer">' +
-              '<div class="res-seats" style="color:' + U.esc(p.color) + '">' + p.escanos + '</div>' +
-              '<div><div style="font-weight:800">' + U.esc(p.candidato) +
-                (i === 0 && hayMayoria && !empate ? ' <span class="chip chip-fire">👑 Presidente</span>' : '') + '</div>' +
-                '<div class="tiny muted">' + U.esc(p.nombre) + '</div>' +
-                '<div class="res-bar"><div class="res-bar-fill" style="width:' +
-                  Math.round((p.escanos / C.ESCANOS) * 100) + '%;background:' + U.esc(p.color) + '"></div></div></div>' +
-              '<div style="text-align:right"><div style="font-weight:750">' +
-                (total ? Math.round((p.escanos / total) * 100) : 0) + '%</div>' +
-                '<div class="tiny muted">' + p.escanos + ' voto' + (p.escanos === 1 ? '' : 's') + '</div></div>' +
-            '</div>').join('') + '</div>' +
-          '<div class="tiny muted" style="margin-top:1rem">Participación: ' + total + ' de ' + C.ESCANOS +
-            ' (' + Math.round((total / C.ESCANOS) * 100) + '%). Mayoría absoluta: ' + C.MAYORIA + ' escaños.</div>' +
-        '</div>' +
-
-        /* pactos posibles */
-        (!hayMayoria || empate ? pactos(rep) : '') +
-
-        /* gabinete del ganador */
-        (hayMayoria && !empate ? gabineteGanador(ganador.id) : '')
-      ) : U.vacio('🗳️', 'No se registró ningún voto', 'No hay nada que repartir.')) +
-    '</div>');
+    pintar();
   }
 
+  /* Combinaciones que suman la mayoría absoluta */
   function pactos(rep) {
-    const conEscanos = rep.filter((p) => p.escanos > 0);
-    const posibles = [];
-    for (let i = 0; i < conEscanos.length; i++) {
-      for (let j = i + 1; j < conEscanos.length; j++) {
-        const suma = conEscanos[i].escanos + conEscanos[j].escanos;
-        if (suma >= C.MAYORIA) posibles.push({ a: conEscanos[i], b: conEscanos[j], suma });
+    const c = rep.filter((p) => p.escanos > 0);
+    const suma = (a) => a.reduce((s, p) => s + p.escanos, 0);
+    let combos = [];
+    for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) {
+      if (suma([c[i], c[j]]) >= C.MAYORIA) combos.push([c[i], c[j]]);
+    }
+    if (!combos.length) {
+      for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) for (let k = j + 1; k < c.length; k++) {
+        if (suma([c[i], c[j], c[k]]) >= C.MAYORIA) combos.push([c[i], c[j], c[k]]);
       }
     }
-    posibles.sort((x, y) => y.suma - x.suma);
-    return '<div class="card reveal d4">' +
+    combos.sort((a, b) => suma(b) - suma(a));
+    return '<div class="card reveal" style="margin-top:1.4rem">' +
       '<h3 style="margin-bottom:.3rem">🤝 Pactos que darían mayoría</h3>' +
-      '<p class="tiny muted" style="margin-bottom:1rem">Combinaciones de dos que llegan a ' + C.MAYORIA + ' escaños.</p>' +
-      (posibles.length
-        ? '<div class="grid" style="gap:.6rem">' + posibles.slice(0, 6).map((p) =>
-          '<div class="kv"><div class="row" style="justify-content:space-between">' +
-            '<div class="row" style="gap:.5rem">' +
-              '<span class="chip" style="border-color:' + U.esc(p.a.color) + '66"><span class="dot" style="background:' + U.esc(p.a.color) + '"></span>' + U.esc(p.a.candidato) + '</span>' +
-              '<span class="muted">+</span>' +
-              '<span class="chip" style="border-color:' + U.esc(p.b.color) + '66"><span class="dot" style="background:' + U.esc(p.b.color) + '"></span>' + U.esc(p.b.candidato) + '</span>' +
-            '</div>' +
-            '<div><b style="color:var(--lime)">' + p.suma + '</b> <span class="tiny muted">escaños</span></div>' +
-          '</div></div>').join('') + '</div>'
-        : '<p class="muted tiny">Ni juntándose de dos en dos llegan a la mayoría. Esto se arregla hablando.</p>') +
-      '</div>';
+      '<p class="tiny muted" style="margin-bottom:1rem">Hacen falta ' + C.MAYORIA + ' escaños. La presidencia sería para quien más escaños aporte al pacto.</p>' +
+      (combos.length
+        ? '<div class="grid" style="gap:.7rem">' + combos.slice(0, 8).map((cb) => {
+            const lider = cb.slice().sort((a, b) => b.escanos - a.escanos)[0];
+            return '<div class="kv"><div class="row" style="justify-content:space-between;gap:.6rem">' +
+              '<div class="row" style="gap:.4rem">' + cb.map((p) => '<span class="chip" style="border-color:' + U.esc(p.color) + '66">' +
+                '<span class="dot" style="background:' + U.esc(p.color) + '"></span>' + U.esc(p.candidato) + ' (' + p.escanos + ')</span>').join('<span class="muted">+</span>') + '</div>' +
+              '<div><b style="color:var(--lime)">' + suma(cb) + '</b> <span class="tiny muted">escaños · preside ' + U.esc(lider.candidato) + '</span></div>' +
+            '</div></div>';
+          }).join('') + '</div>'
+        : '<p class="muted tiny">Ni sumando a todos llegan a la mayoría porque hubo abstención. Habrá que repetir la votación.</p>') +
+    '</div>';
   }
 
   function gabineteGanador(id) {
@@ -2270,7 +2305,7 @@
             'Los tienes en claro en el archivo <code>CODIGOS-PRIVADO.md</code>, que no se sube a ningún sitio.</p>' +
           '<div class="table-wrap"><table><thead><tr><th>Miembro</th><th>Votó</th></tr></thead><tbody>' +
           C.MIEMBROS.map((m) => '<tr><td>' + U.esc(m.nombre) + '</td>' +
-            '<td>' + (S.d.votos.some((v) => v.votante === m.nombre) ? '✅ Sí' : '— Pendiente') + '</td></tr>').join('') +
+            '<td>' + (S.f.resultados ? (S.d.votos.some((v) => v.votante === m.nombre) ? '✅ Sí' : '— Pendiente') : '🔒') + '</td></tr>').join('') +
           '</tbody></table></div>' +
           '<div style="margin-top:1.1rem"><label>Generar la huella de un código nuevo</label>' +
             '<div class="hint">Si alguien pierde el suyo: escribe un código nuevo, copia la huella y pégala en su <code>hash</code> de <code>js/config.js</code>.</div>' +
@@ -2282,14 +2317,16 @@
 
         '<div class="card"><h3 style="margin-bottom:.9rem">👀 Recuento en vivo</h3>' +
           '<p class="tiny muted" style="margin-bottom:.9rem">Solo lo ves tú. Han votado ' + S.d.votos.length + ' de ' + C.ESCANOS + '.</p>' +
-          (S.d.votos.length
+          (S.d.votos.length && S.f.resultados
             ? '<div class="results-list">' + rep.filter((p) => p.escanos).map((p) =>
               '<div class="res-row"><div class="res-seats" style="color:' + U.esc(p.color) + '">' + p.escanos + '</div>' +
               '<div><div style="font-weight:700">' + U.esc(p.candidato) + '</div>' +
               '<div class="res-bar"><div class="res-bar-fill" style="width:' +
               Math.round((p.escanos / C.ESCANOS) * 100) + '%;background:' + U.esc(p.color) + '"></div></div></div>' +
               '<div class="tiny muted">' + Math.round((p.escanos / S.d.votos.length) * 100) + '%</div></div>').join('') + '</div>'
-            : '<p class="muted tiny">Sin votos todavía.</p>') +
+            : '<p class="muted tiny">' + (S.d.votos.length
+                ? '🔒 Voto secreto: el desglose se muestra al cerrar las urnas, también aquí.'
+                : 'Sin votos todavía.') + '</p>') +
         '</div>' +
 
         '<div class="card" style="grid-column:1/-1"><h3 style="margin-bottom:.9rem">🧹 Moderar contenido</h3>' +
@@ -2300,7 +2337,7 @@
             tab('preguntas', 'Preguntas (' + S.d.preguntas.length + ')') +
             tab('debate', 'Debate (' + S.d.debate.length + ')') +
             tab('comentarios', 'Comentarios (' + S.d.comentarios.length + ')') +
-            tab('votos', 'Votos (' + S.d.votos.length + ')') +
+            (S.f.resultados ? tab('votos', 'Votos (' + S.d.votos.length + ')') : '') +
           '</div><div id="mod-body"></div></div>' +
       '</div></div>');
 

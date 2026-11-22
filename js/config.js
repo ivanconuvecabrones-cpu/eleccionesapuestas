@@ -35,7 +35,8 @@ window.CONFIG = {
     { nombre: 'Marc Sarria',    hash: '5f9f5eeb94b1a9db187d283b22b1ebd68140bfc55ef8ea9d92ce9f916c572f35' },
     { nombre: 'Oscar Mongares', hash: '98f3dfc1eb4017fcd3b9d3549bf1ba73bdb474ee0c76f0fb7aa30359e139550a' },
     { nombre: 'Eric Gil',       hash: 'bd388266255530b59a74bdf02294fe97a9cae786ab7706d4ca1aa2ebd7bdab15' },
-    { nombre: 'Isaac',          hash: '61a0c6ba66a780a538f78f1a27a37060fd72a77971a9db4ddf82ba308f8f87ff' }
+    { nombre: 'Isaac',          hash: '61a0c6ba66a780a538f78f1a27a37060fd72a77971a9db4ddf82ba308f8f87ff' },
+    { nombre: 'Nico Medina',    hash: '6d6ec4c7806a3ae024e74e3f3d709acf471ede798304d46d6ffae50c6cfa84e1' }
   ],
 
   /* ---------- 4. CALENDARIO ELECTORAL ---------- */
@@ -44,11 +45,11 @@ window.CONFIG = {
     cierre_candidatos:'2026-11-20T23:59:59',
     debate:           '2026-11-21T22:00:00',
     apertura_voto:    '2026-11-21T00:00:00',
-    cierre_voto:      '2026-11-22T23:59:59'
+    cierre_voto:      '2026-11-22T20:00:00'
   },
 
   /* ---------- 5. ESCAÑOS ---------- */
-  ESCANOS: 11,                 // 1 votante = 1 escaño
+  ESCANOS: 12,                 // 1 votante = 1 escaño
   get MAYORIA() { return Math.floor(this.ESCANOS / 2) + 1; },   // 6
 
   /* ---------- 6. CASAS DE APUESTAS ---------- */
