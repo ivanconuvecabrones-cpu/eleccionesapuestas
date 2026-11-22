@@ -141,11 +141,12 @@
     S.param = partes[1] || '';
     marcarNav();
     if (S.ruta !== '/editar') S.editando = null;
+    if (S.ruta !== '/directo' && window.__quitarDirecto && document.getElementById('directo')) window.__quitarDirecto();
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     const vistas = {
       '/': vInicio, '/candidatos': vCandidatos, '/candidato': vCandidato,
-      '/presentar': vPresentar, '/editar': vEditar, '/noticia': vNoticia, '/comparar': vComparar, '/test': vTest,
+      '/presentar': vPresentar, '/editar': vEditar, '/noticia': vNoticia, '/directo': vDirecto, '/comparar': vComparar, '/test': vTest,
       '/sondeo': vSondeo, '/debate': vDebate, '/muro': vMuro,
       '/preguntas': vPreguntas, '/votar': vVotar, '/resultados': vResultados,
       '/admin': vAdmin
@@ -2096,7 +2097,8 @@
         progresoVoto(false) +
         '<div class="row" style="margin-top:1.4rem">' +
           (S.f.voto === 'abierta' ? '<a class="btn btn-fire" data-ruta="/votar">🗳️ Votar</a>' : '') +
-          '<a class="btn" data-ruta="/candidatos">Ver candidatos</a></div></div>');
+          '<a class="btn" data-ruta="/candidatos">Ver candidatos</a>' +
+          '<a class="btn btn-ghost" data-ruta="/directo/ensayo">🎬 Ensayo del modo directo</a></div></div>');
       if ($('#cd-res')) U.pintarCountdown($('#cd-res'), C.FECHAS.cierre_voto);
       return;
     }
@@ -2121,6 +2123,7 @@
         '<p class="lead tiny">' + total + ' votos de ' + T + ' posibles. Mayoría absoluta: ' + C.MAYORIA + ' escaños.</p></div>' +
       '<div class="card" style="margin-bottom:1.2rem"><div class="hemi-wrap" id="cer-hemi"></div>' +
         '<div class="hemi-leyenda" id="cer-ley"></div></div>' +
+      '<div class="row" style="justify-content:center;margin-bottom:.9rem"><a class="btn btn-primary btn-lg" data-ruta="/directo">🎬 Modo directo (pantalla compartida)</a></div>' +
       '<div id="cer-ctrl" class="row" style="justify-content:center;margin-bottom:1.2rem"></div>' +
       '<div id="cer-lista" class="grid" style="gap:.9rem"></div>' +
       '<div id="cer-final"></div></div>');
@@ -2197,6 +2200,217 @@
     };
 
     pintar();
+  }
+
+  /* ============================================================
+     MODO DIRECTO · presentación a pantalla completa para la llamada
+     Se avanza con clic, espacio o flecha derecha; ← vuelve; Esc sale; F pantalla completa.
+     /#/directo  (con los votos reales, cuando ya se pueden ver)
+     /#/directo/ensayo  (con votos de mentira, para probar)
+     ============================================================ */
+  function votosEnsayo() {
+    const cs = S.d.candidatos, n = cs.length, T = C.ESCANOS;
+    const pat = n === 3 ? [5, 4, 3] : null;
+    const orden = [];
+    if (pat) pat.forEach((k, i) => { for (let j = 0; j < k; j++) orden.push(cs[i].id); });
+    else for (let i = 0; i < T; i++) orden.push(cs[i % n].id);
+    const nombres = C.MIEMBROS.map((m) => m.nombre);
+    const base = Date.now() - 4 * 3600 * 1000;
+    return nombres.slice(0, T).map((nom, i) => ({
+      id: 'e' + i, votante: nom, candidato_id: orden[(i * 5) % orden.length],
+      created_at: new Date(base + i * 17 * 60000 + (i % 3) * 600000).toISOString(),
+      ministro_nba: nombres[(i * 3) % nombres.length],
+      ministro_inversiones: nombres[(i * 7 + 1) % nombres.length],
+      ministro_otros: nombres[(i * 2 + 4) % nombres.length]
+    }));
+  }
+
+  function vDirecto() {
+    const ensayo = S.param === 'ensayo';
+    if (!ensayo && !S.f.resultados) {
+      pinta('<div class="wrap section"><div class="alert alert-warn"><div><b>Todavía no se puede</b>El modo directo se abre cuando se cierran las urnas (' +
+        horaCierre() + '). Mientras tanto puedes probarlo con votos de mentira.</div></div>' +
+        '<div class="row" style="margin-top:1rem"><a class="btn btn-primary" data-ruta="/directo/ensayo">🎬 Hacer un ensayo</a>' +
+        '<a class="btn" data-ruta="/resultados">Volver</a></div></div>');
+      return;
+    }
+    if (!S.d.candidatos.length) { pinta('<div class="wrap section">' + U.vacio('🗳️', 'No hay candidatos', '') + '</div>'); return; }
+    presentar(ensayo);
+  }
+
+  function presentar(ensayo) {
+    const T = C.ESCANOS;
+    const votos = ensayo ? votosEnsayo() : S.d.votos;
+    const total = votos.length;
+    const cands = S.d.candidatos;
+    const num = {};
+    votos.forEach((v) => { num[v.candidato_id] = (num[v.candidato_id] || 0) + 1; });
+    const rep = cands.map((c) => ({
+      id: c.id, c: c, candidato: c.nombre, nombre: c.partido || c.nombre, color: c.color || '#ff6b1a',
+      siglas: c.siglas, foto_url: c.foto_url, emoji: c.emoji, escanos: num[c.id] || 0
+    })).sort((a, b) => b.escanos - a.escanos || a.candidato.localeCompare(b.candidato));
+    const orden = rep.slice().reverse();
+    const g = rep[0];
+    const empate = rep.length > 1 && rep[1].escanos === g.escanos;
+    const hayMayoria = g.escanos >= C.MAYORIA && !empate;
+    const nombresMiembros = C.MIEMBROS.map((m) => m.nombre);
+
+    const hemi = (n) => {
+      const vistos = orden.slice(0, n).sort((a, b) => b.escanos - a.escanos);
+      const abiertos = vistos.reduce((s, p) => s + p.escanos, 0);
+      const h = vistos.map((p) => ({ nombre: p.nombre, candidato: p.candidato, color: p.color, escanos: p.escanos }));
+      if (total - abiertos > 0) h.push({ nombre: 'Sin abrir', candidato: 'Sin abrir', color: '#4a4a4f', escanos: total - abiertos });
+      return '<div class="dir-hemi">' + U.hemiciclo(h, T) + '</div>';
+    };
+    const cifra = (n) => '<span class="dir-num" data-n="' + n + '">0</span>';
+    const confeti = () => '<div class="dir-confeti">' + Array.from({ length: 46 }, (_, i) =>
+      '<i style="left:' + ((i * 37) % 100) + '%;background:' + ['#ffb020', '#ff6b1a', '#ff2e63', '#12a46b', '#fff'][i % 5] +
+      ';animation-delay:' + ((i % 12) * 0.18) + 's;animation-duration:' + (3 + (i % 5) * 0.6) + 's"></i>').join('') + '</div>';
+    const puntos = '<div class="dir-puntos"><i></i><i></i><i></i></div>';
+    const foto = (p) => U.avatar(p.c, 'dir-foto');
+
+    const pasos = [];
+
+    /* 1. portada y participación */
+    pasos.push({ h: '<img class="dir-logo" src="img/logo.png" alt=""><div class="dir-eyebrow">Elecciones a la presidencia</div>' +
+      '<h1 class="dir-titulo">EL RECUENTO</h1><div class="dir-sub">Pulsa para abrir la urna</div>' });
+    pasos.push({ h: '<div class="dir-eyebrow">Participación</div><div class="dir-gigante">' + cifra(total) + '<small> de ' + T + '</small></div>' +
+      '<div class="dir-sub">miembros han votado · ' + Math.round(total / T * 100) + '%</div>' +
+      '<div class="dir-barra"><div style="width:' + Math.round(total / T * 100) + '%"></div></div>' +
+      '<div class="dir-sub" style="margin-top:1.6rem">Hay ' + C.MAYORIA + ' escaños para la mayoría absoluta</div>', hemi: 0 });
+
+    /* 2. del último al primero */
+    orden.forEach((p, i) => {
+      const puesto = orden.length - i;
+      const tit = puesto === 1 ? 'Y el nuevo presidente de AveFénix es…' : (puesto === 2 ? 'En segundo lugar…' : (puesto === 3 ? 'En tercer lugar…' : 'En el puesto ' + puesto + '…'));
+      pasos.push({ h: '<div class="dir-teaser' + (puesto === 1 ? ' final' : '') + '">' + tit + '</div>' + puntos, hemi: i });
+      pasos.push({ cls: puesto === 1 ? 'oro' : '', conf: puesto === 1 && hayMayoria,
+        h: '<div class="dir-card" style="--c:' + U.esc(p.color) + '">' + (puesto === 1 && !empate ? '<div class="dir-corona">👑</div>' : '') +
+          foto(p) + '<div class="dir-nombre">' + U.esc(p.candidato) + '</div>' +
+          '<div class="dir-partido" style="color:' + U.esc(p.color) + '">' + U.esc(p.nombre) + '</div>' +
+          '<div class="dir-votos">' + cifra(p.escanos) + '<small> ' + (p.escanos === 1 ? 'escaño' : 'escaños') + '</small></div></div>', hemi: i + 1 });
+    });
+
+    /* 3. mayoría o pactos */
+    if (hayMayoria) {
+      pasos.push({ cls: 'oro', conf: true, h: '<div class="dir-eyebrow">Mayoría absoluta</div><h1 class="dir-titulo">' + U.esc(g.candidato) + '</h1>' +
+        '<div class="dir-sub">' + g.escanos + ' de ' + T + ' escaños · presidente de AveFénix</div>', hemi: orden.length });
+    } else {
+      pasos.push({ h: '<div class="dir-eyebrow">' + (empate ? 'Empate' : 'Sin mayoría absoluta') + '</div><h1 class="dir-titulo">NADIE LLEGA A ' + C.MAYORIA + '</h1>' +
+        '<div class="dir-sub">' + (empate ? 'Empate en lo más alto.' : U.esc(g.candidato) + ' queda primero con ' + g.escanos + ', pero le faltan ' + (C.MAYORIA - g.escanos) + '.') +
+        ' Toca negociar.</div>', hemi: orden.length });
+      pasos.push({ h: '<div class="dir-eyebrow">Mesa de negociación</div><div class="dir-pactos">' + pactos(rep) + '</div>' });
+    }
+
+    /* 4. ministros */
+    C.VOTO_MINISTROS.forEach((mi) => {
+      const cont = {};
+      votos.forEach((v) => { const n = v[mi.clave]; if (n) cont[n] = (cont[n] || 0) + 1; });
+      const lista = Object.keys(cont).map((n) => ({ n: n, v: cont[n] })).sort((a, b) => b.v - a.v || a.n.localeCompare(b.n));
+      if (!lista.length) return;
+      pasos.push({ h: '<div class="dir-teaser">' + mi.icono + ' ' + U.esc(mi.nombre) + '…</div>' + puntos });
+      const max = lista[0].v;
+      pasos.push({ h: '<div class="dir-eyebrow">' + mi.icono + ' ' + U.esc(mi.nombre) + '</div>' +
+        '<div class="dir-nombre grande">' + (lista.filter((x) => x.v === max).length > 3
+          ? 'Empate a ' + max + ' entre ' + lista.filter((x) => x.v === max).length
+          : lista.filter((x) => x.v === max).map((x) => U.esc(x.n)).join(' y ')) + '</div>' +
+        '<div class="dir-sub">' + max + ' voto' + (max === 1 ? '' : 's') + '</div>' +
+        '<div class="dir-lista">' + lista.slice(0, 5).map((x) => '<div class="' + (x.v === max ? 'top' : '') + '"><span>' + U.esc(x.n) +
+          '</span><span>' + x.v + '</span></div>').join('') + '</div>' });
+    });
+
+    /* 5. quién votó a quién, del último al primero */
+    orden.forEach((p) => {
+      const vs = votos.filter((v) => String(v.candidato_id) === String(p.id)).map((v) => v.votante).sort();
+      pasos.push({ h: '<div class="dir-eyebrow">Votaron a</div><div class="dir-nombre grande" style="color:' + U.esc(p.color) + '">' + U.esc(p.candidato) + '</div>' +
+        '<div class="dir-chips">' + (vs.length ? vs.map((n) => '<span>' + U.esc(n) + '</span>').join('') : '<span class="vacio">Nadie</span>') + '</div>' });
+    });
+
+    /* 6. estadísticas */
+    const noVotaron = nombresMiembros.filter((n) => !votos.some((v) => v.votante === n));
+    const margen = rep.length > 1 ? g.escanos - rep[1].escanos : g.escanos;
+    const fechas = votos.map((v) => new Date(v.created_at)).filter((d) => !isNaN(d)).sort((a, b) => a - b);
+    const hh = (d) => d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const porHora = {};
+    fechas.forEach((d) => { const k = d.getHours(); porHora[k] = (porHora[k] || 0) + 1; });
+    const punta = Object.keys(porHora).sort((a, b) => porHora[b] - porHora[a])[0];
+    const autovotos = rep.filter((p) => votos.some((v) => v.votante === p.candidato && String(v.candidato_id) === String(p.id)));
+    const cruzados = rep.map((p) => {
+      const v = votos.find((x) => x.votante === p.candidato);
+      const d = v && cands.find((c) => String(c.id) === String(v.candidato_id));
+      return d && d.id !== p.id ? p.candidato.split(' ')[0] + ' → ' + d.nombre.split(' ')[0] : null;
+    }).filter(Boolean);
+    const mencion = {};
+    votos.forEach((v) => C.VOTO_MINISTROS.forEach((mi) => { if (v[mi.clave]) mencion[v[mi.clave]] = (mencion[v[mi.clave]] || 0) + 1; }));
+    const topMin = Object.keys(mencion).sort((a, b) => mencion[b] - mencion[a])[0];
+    const stat = (ico, k, v) => '<div class="dir-stat"><div class="i">' + ico + '</div><div class="k">' + U.esc(k) + '</div><div class="v">' + v + '</div></div>';
+    pasos.push({ h: '<div class="dir-eyebrow">Las cifras de la noche</div><div class="dir-stats">' +
+      stat('🗳️', 'Participación', Math.round(total / T * 100) + '% · ' + total + '/' + T) +
+      stat('📏', 'Margen del ganador', margen + (margen === 1 ? ' escaño' : ' escaños')) +
+      stat('🏆', 'Mayoría absoluta', hayMayoria ? 'Sí, con ' + g.escanos : 'No: pactos') +
+      stat('🪞', 'Se votaron a sí mismos', autovotos.length + ' de ' + rep.length + ' candidatos') +
+      (cruzados.length ? stat('🔀', 'Votos cruzados', U.esc(cruzados.join(' · '))) : '') +
+      (fechas.length ? stat('⏱️', 'Primer voto', hh(fechas[0])) + stat('🏁', 'Último voto', hh(fechas[fechas.length - 1])) : '') +
+      (punta !== undefined ? stat('📈', 'Hora punta', punta + ':00 (' + porHora[punta] + ' votos)') : '') +
+      (topMin ? stat('🏛️', 'Más pedido de ministro', U.esc(topMin) + ' (' + mencion[topMin] + ')') : '') +
+      (noVotaron.length ? stat('🤷', 'No votaron', U.esc(noVotaron.join(', '))) : stat('✅', 'Votaron todos', total + ' de ' + T)) +
+      '</div>' });
+
+    /* 7. cierre */
+    pasos.push({ cls: 'oro', conf: true, h: '<img class="dir-logo" src="img/logo.png" alt="">' +
+      (hayMayoria
+        ? '<div class="dir-eyebrow">Presidente de AveFénix</div><h1 class="dir-titulo">' + U.esc(g.candidato) + '</h1><div class="dir-partido" style="color:' + U.esc(g.color) + '">' + U.esc(g.nombre) + '</div>'
+        : '<div class="dir-eyebrow">Primera fuerza</div><h1 class="dir-titulo">' + U.esc(g.candidato) + '</h1><div class="dir-sub">Con la presidencia pendiente de pactos</div>') +
+      '<div class="dir-sub" style="margin-top:1.4rem">Gracias a todos por votar 🔥</div>' });
+
+    /* ---- la pantalla ---- */
+    document.body.classList.add('en-directo');
+    const el = document.createElement('div');
+    el.id = 'directo';
+    el.innerHTML = '<div class="dir-fondo"></div><div class="dir-escena" id="dir-escena"></div>' +
+      '<div class="dir-pie"><span id="dir-prog"></span><span class="dir-ayuda">clic / espacio / → avanzar · ← volver · F pantalla completa · Esc salir' +
+      (ensayo ? ' · <b style="color:var(--amber)">ENSAYO con votos de mentira</b>' : '') + '</span></div>';
+    document.body.appendChild(el);
+    pinta('<div class="wrap section"><div class="spinner"></div></div>');
+
+    let i = 0;
+    const mostrar = () => {
+      const p = pasos[i];
+      const esc = $('#dir-escena');
+      esc.className = 'dir-escena ' + (p.cls || '');
+      esc.innerHTML = '<div class="dir-centro">' + p.h + '</div>' + (p.hemi != null ? hemi(p.hemi) : '') + (p.conf ? confeti() : '');
+      $('#dir-prog').innerHTML = pasos.map((_, k) => '<i class="' + (k < i ? 'h' : (k === i ? 'a' : '')) + '"></i>').join('');
+      $$('.dir-num', esc).forEach((n) => {
+        const fin = Number(n.dataset.n), t0 = performance.now();
+        const paso = (t) => {
+          const k = Math.min(1, (t - t0) / 1300);
+          n.textContent = Math.round(fin * (1 - Math.pow(1 - k, 3)));
+          if (k < 1 && document.body.contains(n)) requestAnimationFrame(paso);
+        };
+        requestAnimationFrame(paso);
+      });
+    };
+    const sigue = () => { if (i < pasos.length - 1) { i++; mostrar(); } };
+    const vuelve = () => { if (i > 0) { i--; mostrar(); } };
+    const salir = () => { quitar(); ir(ensayo ? '/resultados' : '/resultados'); };
+    const quitar = () => {
+      document.removeEventListener('keydown', teclas);
+      el.remove(); document.body.classList.remove('en-directo');
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+    const teclas = (e) => {
+      if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'Enter' || e.key === 'PageDown') { e.preventDefault(); sigue(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); vuelve(); }
+      else if (e.key === 'Escape') salir();
+      else if (e.key === 'f' || e.key === 'F') {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else document.documentElement.requestFullscreen().catch(() => {});
+      }
+    };
+    document.addEventListener('keydown', teclas);
+    el.addEventListener('click', (e) => { if (!e.target.closest('a,button')) sigue(); });
+    window.__quitarDirecto = quitar;
+    mostrar();
   }
 
   /* Los ministros que ha elegido la gente (votación aparte, secreta hasta el cierre) */

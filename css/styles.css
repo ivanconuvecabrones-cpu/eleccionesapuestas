@@ -806,3 +806,69 @@ label.check input{width:auto;accent-color:var(--fire)}
 @keyframes cerEntra{from{opacity:0;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
 #cer-lista{display:flex;flex-direction:column}
 .progreso-voto .bar-fill{transition:width 1s ease}
+
+
+/* ---------- MODO DIRECTO (pantalla compartida) ---------- */
+body.en-directo{overflow:hidden}
+#directo{position:fixed;inset:0;z-index:500;background:#050506;color:#fff;cursor:pointer;user-select:none}
+.dir-fondo{position:absolute;inset:0;background:
+  radial-gradient(900px 600px at 50% 30%,rgba(255,107,26,.28),transparent 65%),
+  radial-gradient(700px 500px at 85% 100%,rgba(255,46,99,.15),transparent 60%),#050506;
+  animation:dirRespira 6s ease-in-out infinite alternate}
+@keyframes dirRespira{from{opacity:.75}to{opacity:1}}
+.dir-escena{position:absolute;inset:0 0 54px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:1.5rem;text-align:center;animation:dirEntra .55s cubic-bezier(.2,.9,.2,1)}
+@keyframes dirEntra{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.dir-escena.oro::before{content:'';position:absolute;inset:0;background:radial-gradient(600px 420px at 50% 40%,rgba(255,176,32,.35),transparent 70%);pointer-events:none}
+.dir-centro{position:relative;z-index:2;max-width:1000px;width:100%;display:flex;flex-direction:column;align-items:center;gap:.6rem}
+.dir-logo{width:min(26vh,220px);filter:drop-shadow(0 0 50px rgba(255,140,30,.6));margin-bottom:.4rem}
+.dir-eyebrow{font-size:clamp(.8rem,1.6vw,1.2rem);letter-spacing:.34em;text-transform:uppercase;color:var(--amber);font-weight:800}
+.dir-titulo{font-family:var(--font-display);font-size:clamp(2.6rem,9vw,7rem);line-height:.95;text-transform:uppercase;margin:.2rem 0}
+.dir-sub{font-size:clamp(1rem,2.2vw,1.7rem);color:var(--ink-2)}
+.dir-gigante{font-family:var(--font-display);font-size:clamp(5rem,20vw,14rem);line-height:1;color:var(--amber)}
+.dir-gigante small{font-size:.28em;color:var(--ink-2)}
+.dir-barra{width:min(620px,80%);height:16px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:1rem}
+.dir-barra div{height:100%;background:linear-gradient(90deg,#ff6b1a,#ffb020);border-radius:99px;animation:dirBarra 1.4s ease-out}
+@keyframes dirBarra{from{width:0!important}}
+.dir-teaser{font-family:var(--font-display);font-size:clamp(1.8rem,6vw,4.6rem);text-transform:uppercase;line-height:1.05}
+.dir-teaser.final{color:var(--amber);text-shadow:0 0 40px rgba(255,176,32,.6)}
+.dir-puntos{display:flex;gap:.8rem;margin-top:1.2rem}
+.dir-puntos i{width:18px;height:18px;border-radius:50%;background:var(--amber);animation:dirPunto 1.1s infinite}
+.dir-puntos i:nth-child(2){animation-delay:.25s}.dir-puntos i:nth-child(3){animation-delay:.5s}
+@keyframes dirPunto{0%,100%{opacity:.2;transform:scale(.7)}50%{opacity:1;transform:scale(1.2)}}
+.dir-card{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:1.4rem 2.4rem;border-radius:30px;
+  border:2px solid var(--c);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 22%,transparent),rgba(255,255,255,.03));
+  box-shadow:0 0 90px -20px var(--c);position:relative}
+.dir-corona{font-size:clamp(2.4rem,6vw,4.4rem);position:absolute;top:-.95em;animation:dirFlota 2.2s ease-in-out infinite}
+@keyframes dirFlota{50%{transform:translateY(-10px) rotate(4deg)}}
+.dir-foto{width:min(24vh,210px);height:min(24vh,210px);border-radius:26px;object-fit:cover;border:3px solid var(--c)}
+.dir-foto-ph{width:min(24vh,210px);height:min(24vh,210px);border-radius:26px;display:grid;place-items:center;font-size:5rem;background:rgba(255,255,255,.06)}
+.dir-nombre{font-family:var(--font-display);font-size:clamp(1.8rem,5vw,3.6rem);text-transform:uppercase;line-height:1}
+.dir-nombre.grande{font-size:clamp(2.4rem,8vw,6rem)}
+.dir-partido{font-size:clamp(1rem,2vw,1.5rem);font-weight:800}
+.dir-votos{font-family:var(--font-display);font-size:clamp(3rem,9vw,6.5rem);line-height:1;color:var(--c)}
+.dir-votos small{font-size:.22em;color:var(--ink-2);letter-spacing:.1em;text-transform:uppercase}
+.dir-hemi{position:relative;z-index:2;width:min(640px,86vw);margin-top:.4rem}
+.dir-lista{display:grid;gap:.3rem;width:min(460px,90%);margin-top:.8rem}
+.dir-lista div{display:flex;justify-content:space-between;padding:.4rem .9rem;border-radius:10px;background:rgba(255,255,255,.06);font-size:1.15rem}
+.dir-lista .top{background:rgba(255,176,32,.18);color:var(--amber);font-weight:850}
+.dir-chips{display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center;max-width:900px;margin-top:1rem}
+.dir-chips span{padding:.55rem 1.1rem;border-radius:99px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);font-size:clamp(1rem,2vw,1.5rem);font-weight:700;animation:dirEntra .6s backwards}
+.dir-chips span:nth-child(2){animation-delay:.12s}.dir-chips span:nth-child(3){animation-delay:.24s}.dir-chips span:nth-child(4){animation-delay:.36s}
+.dir-chips span:nth-child(n+5){animation-delay:.5s}
+.dir-chips .vacio{opacity:.6;font-style:italic}
+.dir-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.9rem;width:min(1050px,96%);margin-top:.8rem}
+.dir-stat{padding:1rem 1.1rem;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);text-align:left;animation:dirEntra .6s backwards}
+.dir-stat:nth-child(2){animation-delay:.1s}.dir-stat:nth-child(3){animation-delay:.2s}.dir-stat:nth-child(4){animation-delay:.3s}.dir-stat:nth-child(n+5){animation-delay:.4s}
+.dir-stat .i{font-size:1.6rem}.dir-stat .k{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:.2rem}
+.dir-stat .v{font-weight:800;font-size:1.3rem;margin-top:.2rem}
+.dir-pactos{width:min(900px,96%);text-align:left}
+.dir-pie{position:absolute;left:0;right:0;bottom:0;height:54px;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:0 1.2rem;gap:1rem}
+#dir-prog{display:flex;gap:5px;flex-wrap:wrap}
+#dir-prog i{width:22px;height:5px;border-radius:9px;background:rgba(255,255,255,.14)}
+#dir-prog i.h{background:rgba(255,176,32,.6)}#dir-prog i.a{background:#ffb020}
+.dir-ayuda{font-size:.76rem;color:var(--muted)}
+.dir-confeti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:3}
+.dir-confeti i{position:absolute;top:-20px;width:11px;height:18px;border-radius:3px;animation:dirCae linear infinite}
+@keyframes dirCae{to{transform:translateY(115vh) rotate(720deg)}}
+@media(max-width:700px){.dir-ayuda{display:none}.dir-card{padding:1rem 1.2rem}}
