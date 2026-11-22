@@ -45,7 +45,7 @@ window.CONFIG = {
     cierre_candidatos:'2026-11-20T23:59:59',
     debate:           '2026-11-21T22:00:00',
     apertura_voto:    '2026-11-21T00:00:00',
-    cierre_voto:      '2026-11-22T22:00:00'
+    cierre_voto:      '2026-11-22T22:30:00'
   },
 
   /* ---------- 5. ESCAÑOS ---------- */
