@@ -2013,6 +2013,12 @@
                 (c.alias ? ' <span class="muted tiny">«' + U.esc(c.alias) + '»</span>' : '') + '</div>' +
                 '<div class="tiny" style="color:' + U.esc(c.color) + '">' + U.esc(c.partido || '') + '</div></div></div>').join('') +
               '</div></div>' +
+            '<div class="field"><label>Tus ministros <span class="muted tiny">(opcional)</span></label>' +
+              '<div class="hint">A quién te gustaría de ministro. También es secreto hasta el recuento.</div>' +
+              C.VOTO_MINISTROS.map((mi) => '<div style="margin-top:.6rem"><div class="tiny" style="font-weight:700;margin-bottom:.25rem">' +
+                mi.icono + ' ' + U.esc(mi.nombre) + '</div><select class="v-min" data-k="' + mi.clave + '">' +
+                U.opciones(C.MIEMBROS.map((x) => x.nombre), '', 'Sin preferencia') + '</select></div>').join('') +
+            '</div>' +
             '<div id="v-aviso"></div>' +
             '<button class="btn btn-fire btn-lg btn-block" type="submit">🗳️ Emitir mi voto</button>' +
             '<p class="tiny muted" style="text-align:center">No se puede cambiar. Nadie ve a quién votas hasta el recuento.</p>' +
@@ -2055,7 +2061,9 @@
         const btn = $('#v-ok');
         btn.disabled = true; btn.textContent = 'Registrando…';
         try {
-          await DB.crear('votos', { votante: m.nombre, candidato_id: elegido });
+          const extra = {};
+          $$('.v-min').forEach((sel) => { extra[sel.dataset.k] = sel.value || null; });
+          await DB.crear('votos', Object.assign({ votante: m.nombre, candidato_id: elegido }, extra));
           await recargar();
           cerrar();
           U.modal('<div style="text-align:center"><div style="font-size:3.4rem">🗳️</div>' +
@@ -2175,6 +2183,7 @@
                 ' Toca pactar.</p>') +
         '</div>' +
         (hayMayoria && !empate ? gabineteGanador(g.id) : pactos(rep)) +
+        ministrosVotados() +
 
         '<div class="card reveal" style="margin-top:1.4rem"><h3 style="margin-bottom:.3rem">🗳️ Quién ha votado a quién</h3>' +
           '<p class="tiny muted" style="margin-bottom:1rem">Ahora que las urnas están cerradas, el voto deja de ser secreto.</p>' +
@@ -2188,6 +2197,28 @@
     };
 
     pintar();
+  }
+
+  /* Los ministros que ha elegido la gente (votación aparte, secreta hasta el cierre) */
+  function ministrosVotados() {
+    const filas = C.VOTO_MINISTROS.map((mi) => {
+      const cont = {};
+      S.d.votos.forEach((v) => { const n = v[mi.clave]; if (n) cont[n] = (cont[n] || 0) + 1; });
+      const lista = Object.keys(cont).map((n) => ({ n, v: cont[n] })).sort((a, b) => b.v - a.v || a.n.localeCompare(b.n));
+      return { mi, lista };
+    });
+    if (!filas.some((f) => f.lista.length)) return '';
+    return '<div class="card reveal" style="margin-top:1.4rem"><h3 style="margin-bottom:.3rem">🏛️ Los ministros que ha elegido la gente</h3>' +
+      '<p class="tiny muted" style="margin-bottom:1rem">Votación aparte. En destacado, el más votado de cada cartera.</p>' +
+      '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem">' +
+      filas.map((f) => {
+        const max = f.lista.length ? f.lista[0].v : 0;
+        return '<div class="kv"><div class="kv-k">' + f.mi.icono + ' ' + U.esc(f.mi.nombre) + '</div>' +
+          (f.lista.length ? f.lista.slice(0, 5).map((x) =>
+            '<div class="row" style="justify-content:space-between;margin-top:.4rem;' + (x.v === max ? 'font-weight:850;color:var(--amber)' : '') + '">' +
+            '<span>' + (x.v === max ? '👑 ' : '') + U.esc(x.n) + '</span><span>' + x.v + '</span></div>').join('')
+            : '<div class="tiny muted" style="margin-top:.4rem">Nadie ha votado esta cartera.</div>') + '</div>';
+      }).join('') + '</div></div>';
   }
 
   /* Combinaciones que suman la mayoría absoluta */

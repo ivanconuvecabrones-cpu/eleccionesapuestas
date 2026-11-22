@@ -69,6 +69,14 @@ window.CONFIG = {
     { clave: 'min_otros',  nombre: 'Ministro de Inversiones', icono: '💹' }
   ],
 
+  /* ---------- 7b. MINISTROS QUE SE VOTAN EL DÍA DE LAS ELECCIONES ----------
+     La clave es el nombre de la columna en la tabla votos. */
+  VOTO_MINISTROS: [
+    { clave: 'ministro_nba',          nombre: 'Ministro de NBA',            icono: '🏀' },
+    { clave: 'ministro_inversiones',  nombre: 'Ministro de Inversiones',    icono: '💹' },
+    { clave: 'ministro_otros',        nombre: 'Ministro de Otros deportes', icono: '🎾' }
+  ],
+
   /* ---------- 8. MÉTRICAS DEL CANDIDATO (1-10) ---------- */
   STATS: [
     { clave: 'riesgo',        nombre: 'Riesgo que asume',        corto: 'Riesgo',       icono: '🎲', desc: '1 = ultra conservador · 10 = kamikaze' },
